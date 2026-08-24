@@ -50,54 +50,49 @@ object DocxGenerator {
     }
 
     private fun replaceTextPlaceholders(doc: XWPFDocument, data: ReportData) {
-    val replacements = mapOf(
-        "{{report_date}}" to data.reportDate,
-        "{{purpose}}" to data.purpose
-    )
+        val replacements = mapOf(
+            "{{report_date}}" to data.reportDate,
+            "{{purpose}}" to data.purpose
+        )
 
-    // 1. Поиск и замена в обычных абзацах
-    for (paragraph in doc.paragraphs) {
-        replaceInParagraph(paragraph, replacements)
-    }
+        // 1. Поиск и замена в обычных абзацах
+        for (paragraph in doc.paragraphs) {
+            replaceInParagraph(paragraph, replacements)
+        }
 
-    // 2. Поиск и замена во всех таблицах (включая таблицы 1-й страницы!)
-    for (table in doc.tables) {
-        for (row in table.rows) {
-            for (cell in row.tableCells) {
-                for (paragraph in cell.paragraphs) {
-                    replaceInParagraph(paragraph, replacements)
+        // 2. Поиск и замена во всех таблицах (включая таблицы 1-й страницы!)
+        for (table in doc.tables) {
+            for (row in table.rows) {
+                for (cell in row.tableCells) {
+                    for (paragraph in cell.paragraphs) {
+                        replaceInParagraph(paragraph, replacements)
+                    }
                 }
             }
         }
     }
-}
 
-private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFParagraph, replacements: Map<String, String>) {
-    for ((target, replacement) in replacements) {
-        if (paragraph.text.contains(target)) {
-            for (run in paragraph.runs) {
-                val text = run.getText(0)
-                if (text != null && text.contains(target)) {
-                    run.setText(text.replace(target, replacement), 0)
+    private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFParagraph, replacements: Map<String, String>) {
+        for ((target, replacement) in replacements) {
+            if (paragraph.text.contains(target)) {
+                for (run in paragraph.runs) {
+                    val text = run.getText(0)
+                    if (text != null && text.contains(target)) {
+                        run.setText(text.replace(target, replacement), 0)
+                    }
                 }
             }
         }
     }
-}
-
 
     private fun fillExpensesTable(table: XWPFTable, data: ReportData) {
-        // Строка 0,1,2 — это шапки таблицы.
-        // Индекс 3 — строка "Суточные" (1-я строка расходов).
-        // Индекс 4 — эталонная строка для чеков.
-        
         val perDiemRowIndex = 3
         val templateRowIndex = 4
 
         // 1. Заполняем Строку 1 (Суточные)
         val row1 = table.getRow(perDiemRowIndex)
         setCellText(row1, 0, "1")
-        setCellText(row1, 1, "${data.startDate}\n${data.endDate}") // Две даты друг под другом
+        setCellText(row1, 1, "${data.startDate}\n${data.endDate}")
         setCellText(row1, 2, "-")
         setCellText(row1, 3, "Суточные")
         setCellText(row1, 4, String.format(Locale.US, "%.2f", data.perDiemSum))
@@ -117,7 +112,7 @@ private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFPara
             val currentRow = if (i == 0) {
                 templateRow
             } else {
-                val clonedCTRow = CTRow.Factory.parse(templateRow.ctRow.xmlText)
+                val clonedCTRow = CTRow.Factory.parse(templateRow.ctRow.xmlText())
                 val newRow = XWPFTableRow(clonedCTRow, table)
                 table.addRow(newRow, templateRowIndex + i)
                 newRow
@@ -131,7 +126,6 @@ private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFPara
                 setCellText(currentRow, 4, String.format(Locale.US, "%.2f", expense.sum))
                 currentTotalSum += expense.sum
             } else {
-                // Если чеков меньше 4 — опускаем пустую линованную строку с номером
                 setCellText(currentRow, 0, rowNum)
                 setCellText(currentRow, 1, "")
                 setCellText(currentRow, 2, "")
@@ -140,16 +134,14 @@ private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFPara
             }
         }
 
-        // 3. Обновляем строку "Итого" (последняя строка таблицы)
+        // 3. Обновляем строку "Итого"
         val totalRow = table.getRow(table.numberOfRows - 1)
-        // В форме АО-1 итоговая сумма пишется в 5-ю колонку
         val totalCellIndex = 4
         setCellText(totalRow, totalCellIndex, String.format(Locale.US, "%.2f", currentTotalSum))
     }
 
     private fun setCellText(row: XWPFTableRow, cellIndex: Int, text: String) {
         val cell = row.getCell(cellIndex) ?: return
-        // Очищаем старый текст
         while (cell.paragraphs.size > 1) {
             cell.removeParagraph(1)
         }
@@ -158,7 +150,6 @@ private fun replaceInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFPara
         
         val run = if (p.runs.isNotEmpty()) p.runs[0] else p.createRun()
         
-        // Обработка переноса строки (\n) для дат суточных
         if (text.contains("\n")) {
             val lines = text.split("\n")
             run.setText(lines[0], 0)
