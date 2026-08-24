@@ -22,7 +22,9 @@ jobs:
           gradle-version: '8.5'
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug
+        timeout-minutes: 10
+        run: ./gradlew assembleDebug --no-daemon
+
 
 
       - name: Upload APK
