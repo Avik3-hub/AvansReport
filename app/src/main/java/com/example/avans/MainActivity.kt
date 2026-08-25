@@ -106,7 +106,15 @@ fun AvansReportScreen(
 
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
+    
+    // Данные сотрудника
+    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин С. В.") ?: "Нагибин С. В.") }
+    var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
+    var position by remember { mutableStateOf(prefs.getString("emp_position", "авиатехник по АиРЭО") ?: "авиатехник по АиРЭО") }
+    var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
+
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showEmployeeDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
 
     var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
@@ -156,6 +164,13 @@ fun AvansReportScreen(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Данные сотрудника") },
+                            onClick = {
+                                showMenu = false
+                                showEmployeeDialog = true
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text("Настройки суточных") },
                             onClick = {
@@ -317,7 +332,13 @@ fun AvansReportScreen(
                             startDate = startDate,
                             endDate = endDate,
                             perDiemSum = perDiemSum,
-                            expenses = expenses
+                            expenses = expenses,
+                            employee = EmployeeInfo(
+                                name = employeeName,
+                                tabNumber = tabNumber,
+                                position = position,
+                                department = department
+                            )
                         )
                         generateAndOpenReport(context, data)
                     },
@@ -329,6 +350,29 @@ fun AvansReportScreen(
                 }
             }
         }
+    }
+
+    if (showEmployeeDialog) {
+        EmployeeDialog(
+            currentName = employeeName,
+            currentTabNumber = tabNumber,
+            currentPosition = position,
+            currentDepartment = department,
+            onDismiss = { showEmployeeDialog = false },
+            onSave = { name, tab, pos, dept ->
+                employeeName = name
+                tabNumber = tab
+                position = pos
+                department = dept
+                prefs.edit()
+                    .putString("emp_name", name)
+                    .putString("emp_tab_number", tab)
+                    .putString("emp_position", pos)
+                    .putString("emp_department", dept)
+                    .apply()
+                showEmployeeDialog = false
+            }
+        )
     }
 
     if (showSettingsDialog) {
@@ -347,6 +391,62 @@ fun AvansReportScreen(
             }
         )
     }
+}
+
+@Composable
+fun EmployeeDialog(
+    currentName: String,
+    currentTabNumber: String,
+    currentPosition: String,
+    currentDepartment: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+    var tabNumber by remember { mutableStateOf(currentTabNumber) }
+    var position by remember { mutableStateOf(currentPosition) }
+    var department by remember { mutableStateOf(currentDepartment) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Данные сотрудника") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Подотчетное лицо (ФИО)") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = tabNumber,
+                    onValueChange = { tabNumber = it },
+                    label = { Text("Табельный номер") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = position,
+                    onValueChange = { position = it },
+                    label = { Text("Профессия (должность)") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = department,
+                    onValueChange = { department = it },
+                    label = { Text("Структурное подразделение") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name, tabNumber, position, department) }) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
