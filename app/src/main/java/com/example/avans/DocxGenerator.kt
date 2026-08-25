@@ -89,15 +89,9 @@ object DocxGenerator {
     }
 
     private fun fillExpensesTable(table: XWPFTable, data: ReportData) {
-        // Индексы строк в шаблоне AO-1:
-        // 0..2 - Заголовки
-        // 3    - Нумерация колонок (1, 2, 3, 4, 5, 6, 7, 8, 9)
-        // 4    - Строка №1 (Суточные)
-        // 5+   - Чеки и билеты
         val perDiemRowIndex = 4
         val firstExpenseRowIndex = 5
 
-        // Сохраняем чистый XML пустой строки ДО заполнения данных
         val templateRow = table.getRow(firstExpenseRowIndex)
         val cleanRowXml = templateRow?.ctRow?.xmlText()
 
@@ -113,7 +107,7 @@ object DocxGenerator {
 
         var currentTotalSum = data.perDiemSum
         val expensesCount = data.expenses.size
-        val minDataRows = 6 // Гарантированный минимум отображаемых строк
+        val minDataRows = 5 // Гарантированный минимум отображаемых строк под чеки
 
         val totalRowsNeeded = maxOf(minDataRows, expensesCount)
 
@@ -121,7 +115,6 @@ object DocxGenerator {
             val rowIndex = firstExpenseRowIndex + i
             val expense = data.expenses.getOrNull(i)
 
-            // Проверяем, существует ли строка (до строки "Итого")
             val currentRow = if (rowIndex < table.numberOfRows - 1) {
                 table.getRow(rowIndex)
             } else {
@@ -142,7 +135,6 @@ object DocxGenerator {
                     setCellText(currentRow, 4, String.format(Locale.US, "%.2f", expense.sum))
                     currentTotalSum += expense.sum
                 } else {
-                    // Явно очищаем пустые строки
                     for (c in 0 until currentRow.tableCells.size) {
                         setCellText(currentRow, c, "")
                     }
@@ -153,7 +145,6 @@ object DocxGenerator {
         // 3. Заполняем строку "Итого"
         val totalRow = table.getRow(table.numberOfRows - 1)
         if (totalRow != null) {
-            // В строке "Итого" первые ячейки объединены. Индекс 1 попадает ровно под колонку 5 ("в руб. коп.")
             setCellText(totalRow, 1, String.format(Locale.US, "%.2f", currentTotalSum))
         }
     }
@@ -167,28 +158,25 @@ object DocxGenerator {
         }
         val p = cell.paragraphs.firstOrNull() ?: cell.addParagraph()
         
-        // Полностью очищаем старые текстовые блоки
-        p.runs.forEach { it.setText("", 0) }
-
-        if (text.isEmpty()) {
-            if (p.runs.isNotEmpty()) {
-                p.runs[0].setText("", 0)
-            }
-            return
+        // Полностью очищаем все элементы текста ячейки
+        while (p.runs.size > 0) {
+            p.removeRun(0)
         }
 
-        val run = if (p.runs.isNotEmpty()) p.runs[0] else p.createRun()
-        
+        if (text.isEmpty()) return
+
         if (text.contains("\n")) {
             val lines = text.split("\n")
-            run.setText(lines[0], 0)
+            val run1 = p.createRun()
+            run1.setText(lines[0])
             for (i in 1 until lines.size) {
                 val nextParagraph = cell.addParagraph()
                 val nextRun = nextParagraph.createRun()
                 nextRun.setText(lines[i])
             }
         } else {
-            run.setText(text, 0)
+            val run = p.createRun()
+            run.setText(text)
         }
     }
 }
