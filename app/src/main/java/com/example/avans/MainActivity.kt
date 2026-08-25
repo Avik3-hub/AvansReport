@@ -38,23 +38,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun generateAndOpenReport(data: ReportData) {
-        try {
-            val outFile = File(cacheDir, "avans_report.docx")
-            DocxGenerator.generateReport(this, data, outFile)
-            val uri = FileProvider.getUriForFile(
-                this,
-                "${packageName}.provider",
-                outFile
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
-        } catch (e: Exception) {
-            Toast.makeText(this, "Ошибка генерации: ${e.message}", Toast.LENGTH_LONG).show()
+    try {
+        val outFile = File(cacheDir, "avans_report.docx")
+        DocxGenerator.generateReport(this, data, outFile)
+
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${packageName}.provider",
+            outFile
+        )
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+
+        startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
+        Toast.makeText(this, "Ошибка: $errorDetails", Toast.LENGTH_LONG).show()
     }
+}
+
 
     data class ExpenseInputState(
         val date: String = "",
