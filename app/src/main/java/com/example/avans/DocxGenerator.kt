@@ -33,9 +33,10 @@ object DocxGenerator {
 
             replaceTextPlaceholders(doc, data)
 
-            if (doc.tables.size > 1) {
-                val table = doc.tables[1]
-                fillExpensesTable(table, data)
+            // Динамический поиск таблицы расходов на оборотной стороне
+            val expensesTable = findExpensesTable(doc)
+            if (expensesTable != null) {
+                fillExpensesTable(expensesTable, data)
             }
 
             FileOutputStream(outputFile).use { out ->
@@ -43,6 +44,16 @@ object DocxGenerator {
             }
             doc.close()
         }
+    }
+
+    private fun findExpensesTable(doc: XWPFDocument): XWPFTable? {
+        // Ищем таблицу, содержащую ключевые заголовки оборотной стороны
+        return doc.tables.find { table ->
+            val tableText = table.text
+            tableText.contains("производственные") || 
+            tableText.contains("Сумма расхода") || 
+            tableText.contains("принятая к учету")
+        } ?: doc.tables.lastOrNull() // Если по тексту не нашли, берем самую последнюю таблицу в документе
     }
 
     private fun replaceTextPlaceholders(doc: XWPFDocument, data: ReportData) {
@@ -83,6 +94,7 @@ object DocxGenerator {
         val perDiemRowIndex = 3
         val templateRowIndex = 4
 
+        // 1. Заполняем суточные (1-я строка)
         val row1 = table.getRow(perDiemRowIndex)
         if (row1 != null) {
             setCellText(row1, 0, "1")
@@ -92,6 +104,7 @@ object DocxGenerator {
             setCellText(row1, 4, String.format(Locale.US, "%.2f", data.perDiemSum))
         }
 
+        // 2. Заполняем чеки и билеты
         val minRegularRows = 4
         val totalRegularRows = maxOf(minRegularRows, data.expenses.size)
         val templateRow = table.getRow(templateRowIndex) ?: return
@@ -127,6 +140,7 @@ object DocxGenerator {
             }
         }
 
+        // 3. Заполняем строку "Итого"
         val totalRow = table.getRow(table.numberOfRows - 1)
         if (totalRow != null) {
             val totalCellIndex = 4
