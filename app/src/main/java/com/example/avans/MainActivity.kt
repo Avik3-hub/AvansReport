@@ -12,10 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import java.io.File
 import java.time.Instant
@@ -42,7 +41,6 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
 
-            // Цветовая палитра OLED (глубокий черный #000000)
             val oledDarkColorScheme = darkColorScheme(
                 primary = Color(0xFFD0BCFF),
                 secondary = Color(0xFFCCC2DC),
@@ -85,20 +83,16 @@ fun AvansReportScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
 
-    // Настройки ставок
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // История для автозаполнения
     var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
     var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
 
-    // Основные поля отчета
     var reportDate by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))) }
     var destinationCity by remember { mutableStateOf("Вологду") }
     
-    // Суточные
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
     var selectedRegion by remember { mutableStateOf(Region.SOUTH) }
@@ -107,7 +101,6 @@ fun AvansReportScreen(
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
 
-    // Список расходов
     var expenses by remember { mutableStateOf(listOf<ExpenseItem>()) }
 
     Scaffold(
@@ -116,9 +109,9 @@ fun AvansReportScreen(
                 title = { Text("Авансовый отчет АО-1") },
                 actions = {
                     IconButton(onClick = onThemeToggle) {
-                        Icon(
-                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Переключить тему"
+                        Text(
+                            text = if (isDarkMode) "☀️" else "🌙",
+                            fontSize = 20.sp
                         )
                     }
                     IconButton(onClick = { showSettingsDialog = true }) {
@@ -135,7 +128,6 @@ fun AvansReportScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Основные данные
             item {
                 Text("1. Основные данные", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -156,7 +148,6 @@ fun AvansReportScreen(
                 )
             }
 
-            // 2. Суточные
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -207,7 +198,6 @@ fun AvansReportScreen(
                 }
             }
 
-            // 3. Чеки и билеты
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -241,14 +231,12 @@ fun AvansReportScreen(
                 )
             }
 
-            // Кнопка генерации
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
                         val fullPurpose = "Командировка в $destinationCity".trim()
                         
-                        // Сохранение в историю
                         destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
                         expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
                             expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
