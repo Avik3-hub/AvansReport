@@ -33,8 +33,13 @@ data class ReportData(
 object DocxGenerator {
 
     fun generateReport(context: Context, data: ReportData, outputFile: File) {
-        // Открываем исходный шаблон из assets
-        val inputStream = context.assets.open("ao1_template.docx")
+        // Указано новое имя шаблона: template.docx
+        val inputStream = try {
+            context.assets.open("template.docx")
+        } catch (e: Exception) {
+            throw Exception("Файл template.docx не найден в папе app/src/main/assets/")
+        }
+
         val doc = XWPFDocument(inputStream)
 
         // Карта замены меток в шаблоне
@@ -47,15 +52,15 @@ object DocxGenerator {
             "{{PURPOSE}}" to data.purpose
         )
 
-        // 1. Замена меток в обычных параграфах
+        // 1. Замена меток в параграфах
         doc.paragraphs.forEach { replaceTextInParagraph(it, replacements) }
 
-        // 2. Замена меток внутри таблиц (шапка, блоки УТВЕРЖДАЮ и подписи)
+        // 2. Замена меток в таблицах
         doc.tables.forEach { table ->
             replaceInTable(table, replacements)
         }
 
-        // 3. Заполнение основной таблицы расходов
+        // 3. Заполнение таблицы расходов
         fillExpenseTable(doc, data)
 
         // Сохранение итогового файла
@@ -88,7 +93,6 @@ object DocxGenerator {
         }
 
         if (needUpdate) {
-            // Очищаем существующие runs и записываем обновленный текст с сохранением базовых свойств
             val runsCount = paragraph.runs.size
             for (i in (runsCount - 1) downTo 0) {
                 paragraph.removeRun(i)
@@ -101,7 +105,6 @@ object DocxGenerator {
     }
 
     private fun fillExpenseTable(doc: XWPFDocument, data: ReportData) {
-        // Находим таблицу расходов (обычно 2-я или 3-я таблица в бланке АО-1)
         val table = doc.tables.getOrNull(1) ?: return
 
         // Суточные (Строка 1)
