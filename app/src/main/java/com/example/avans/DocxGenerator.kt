@@ -2,6 +2,7 @@ package com.example.avans
 
 import android.content.Context
 import org.apache.poi.xwpf.usermodel.XWPFDocument
+import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xwpf.usermodel.XWPFTable
 import java.io.File
 import java.io.FileOutputStream
@@ -33,37 +34,39 @@ data class ReportData(
 object DocxGenerator {
 
     fun generateReport(context: Context, data: ReportData, outputFile: File) {
-        // Указано новое имя шаблона: template.docx
         val inputStream = try {
             context.assets.open("template.docx")
         } catch (e: Exception) {
-            throw Exception("Файл template.docx не найден в папе app/src/main/assets/")
+            throw Exception("Файл template.docx не найден в assets!")
         }
 
         val doc = XWPFDocument(inputStream)
 
-        // Карта замены меток в шаблоне
+        // Словарь замен с поддержкой верхнего и нижнего регистра меток
         val replacements = mapOf(
             "{{REPORT_DATE}}" to data.reportDate,
+            "{{report_date}}" to data.reportDate,
             "{{DEPARTMENT}}" to data.employee.department,
+            "{{department}}" to data.employee.department,
             "{{EMPLOYEE_NAME}}" to data.employee.name,
+            "{{employee_name}}" to data.employee.name,
             "{{TAB_NUMBER}}" to data.employee.tabNumber,
+            "{{tab_number}}" to data.employee.tabNumber,
             "{{POSITION}}" to data.employee.position,
-            "{{PURPOSE}}" to data.purpose
+            "{{position}}" to data.employee.position,
+            "{{PURPOSE}}" to data.purpose,
+            "{{purpose}}" to data.purpose
         )
 
-        // 1. Замена меток в параграфах
+        // 1. Замена меток в абзацах
         doc.paragraphs.forEach { replaceTextInParagraph(it, replacements) }
 
-        // 2. Замена меток в таблицах
-        doc.tables.forEach { table ->
-            replaceInTable(table, replacements)
-        }
+        // 2. Замена меток во всех таблицах
+        doc.tables.forEach { replaceInTable(it, replacements) }
 
         // 3. Заполнение таблицы расходов
         fillExpenseTable(doc, data)
 
-        // Сохранение итогового файла
         FileOutputStream(outputFile).use { out ->
             doc.write(out)
         }
@@ -80,34 +83,30 @@ object DocxGenerator {
         }
     }
 
-    private fun replaceTextInParagraph(paragraph: org.apache.poi.xwpf.usermodel.XWPFParagraph, replacements: Map<String, String>) {
-        val text = paragraph.paragraphText
-        var updatedText = text
-        var needUpdate = false
+    private fun replaceTextInParagraph(paragraph: XWPFParagraph, replacements: Map<String, String>) {
+        var text = paragraph.paragraphText
+        var updated = false
 
         replacements.forEach { (key, value) ->
-            if (updatedText.contains(key)) {
-                updatedText = updatedText.replace(key, value)
-                needUpdate = true
+            if (text.contains(key)) {
+                text = text.replace(key, value)
+                updated = true
             }
         }
 
-        if (needUpdate) {
-            val runsCount = paragraph.runs.size
-            for (i in (runsCount - 1) downTo 0) {
+        if (updated) {
+            for (i in paragraph.runs.size - 1 downTo 0) {
                 paragraph.removeRun(i)
             }
             val newRun = paragraph.createRun()
-            newRun.isBold = true
-            newRun.isItalic = true
-            newRun.setText(updatedText)
+            newRun.setText(text)
         }
     }
 
     private fun fillExpenseTable(doc: XWPFDocument, data: ReportData) {
-        val table = doc.tables.getOrNull(1) ?: return
+        val table = doc.tables.getOrNull(0) ?: return
 
-        // Суточные (Строка 1)
+        // Заполнение первой строки (суточные)
         if (table.rows.size > 1) {
             val row1 = table.getRow(1)
             row1.getCell(0)?.setText("1")
@@ -117,7 +116,7 @@ object DocxGenerator {
             row1.getCell(4)?.setText(String.format("%.2f", data.perDiemSum))
         }
 
-        // Чеки и билеты
+        // Заполнение чеков
         var totalSum = data.perDiemSum
         data.expenses.forEachIndexed { index, item ->
             val row = table.createRow()
@@ -129,7 +128,6 @@ object DocxGenerator {
             totalSum += item.sum
         }
 
-        // Итоговая строка
         val totalRow = table.createRow()
         totalRow.getCell(3)?.setText("Итого израсходовано:")
         totalRow.getCell(4)?.setText(String.format("%.2f", totalSum))
