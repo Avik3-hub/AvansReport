@@ -24,6 +24,19 @@ jobs:
         with:
           gradle-version: '8.5'
 
+      - name: Ensure permanent debug keystore
+        run: |
+          if [ ! -f app/debug.keystore ]; then
+            keytool -genkey -v -keystore app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, O=Android, C=US"
+            git config user.email "action@github.com"
+            git config user.name "GitHub Action"
+            git add app/debug.keystore
+            git commit -m "Add permanent debug keystore"
+            git push
+          fi
+          mkdir -p ~/.android
+          cp app/debug.keystore ~/.android/debug.keystore
+
       - name: Build Debug APK
         run: gradle assembleDebug
 
@@ -38,4 +51,3 @@ jobs:
           files: app/build/outputs/apk/debug/AvansReport.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
