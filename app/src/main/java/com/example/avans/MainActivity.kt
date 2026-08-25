@@ -1,5 +1,6 @@
 package com.example.avans
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -21,10 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -41,18 +44,37 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
 
+            // Настройка цвета статусной строки и навигации Android
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val window = (view.context as Activity).window
+                    window.statusBarColor = if (isDarkMode) android.graphics.Color.BLACK else android.graphics.Color.TRANSPARENT
+                    window.navigationBarColor = if (isDarkMode) android.graphics.Color.BLACK else android.graphics.Color.TRANSPARENT
+                    val insetsController = WindowCompat.getInsetsController(window, view)
+                    insetsController.isAppearanceLightStatusBars = !isDarkMode
+                    insetsController.isAppearanceLightNavigationBars = !isDarkMode
+                }
+            }
+
+            // Мягкая синяя палитра (Soft Blue)
             val oledDarkColorScheme = darkColorScheme(
-                primary = Color(0xFFD0BCFF),
-                secondary = Color(0xFFCCC2DC),
+                primary = Color(0xFF90CAF9),
+                secondary = Color(0xFF64B5F6),
                 background = Color(0xFF000000),
-                surface = Color(0xFF121212),
-                surfaceVariant = Color(0xFF1F1F1F),
+                surface = Color(0xFF000000),
+                surfaceVariant = Color(0xFF121212),
                 onBackground = Color(0xFFE6E1E5),
                 onSurface = Color(0xFFE6E1E5),
                 onSurfaceVariant = Color(0xFFCAC4D0)
             )
 
-            val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme()
+            val lightColorScheme = lightColorScheme(
+                primary = Color(0xFF1976D2),
+                secondary = Color(0xFF0288D1)
+            )
+
+            val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme
 
             MaterialTheme(colorScheme = colorScheme) {
                 Surface(
@@ -107,6 +129,10 @@ fun AvansReportScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Авансовый отчет АО-1") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                ),
                 actions = {
                     IconButton(onClick = onThemeToggle) {
                         Text(
@@ -397,7 +423,7 @@ fun ExpenseCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
