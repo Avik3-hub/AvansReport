@@ -33,7 +33,6 @@ object DocxGenerator {
 
             replaceTextPlaceholders(doc, data)
 
-            // Динамический поиск таблицы расходов на оборотной стороне
             val expensesTable = findExpensesTable(doc)
             if (expensesTable != null) {
                 fillExpensesTable(expensesTable, data)
@@ -47,13 +46,12 @@ object DocxGenerator {
     }
 
     private fun findExpensesTable(doc: XWPFDocument): XWPFTable? {
-        // Ищем таблицу, содержащую ключевые заголовки оборотной стороны
         return doc.tables.find { table ->
             val tableText = table.text
             tableText.contains("производственные") || 
             tableText.contains("Сумма расхода") || 
             tableText.contains("принятая к учету")
-        } ?: doc.tables.lastOrNull() // Если по тексту не нашли, берем самую последнюю таблицу в документе
+        } ?: doc.tables.lastOrNull()
     }
 
     private fun replaceTextPlaceholders(doc: XWPFDocument, data: ReportData) {
@@ -91,10 +89,19 @@ object DocxGenerator {
     }
 
     private fun fillExpensesTable(table: XWPFTable, data: ReportData) {
-        val perDiemRowIndex = 3
-        val templateRowIndex = 4
+        // Индексы строк в шаблоне AO-1:
+        // 0..2 - Заголовки
+        // 3    - Нумерация колонок (1, 2, 3, 4, 5, 6, 7, 8, 9)
+        // 4    - Строка №1 (Суточные)
+        // 5+   - Чеки и билеты
+        val perDiemRowIndex = 4
+        val firstExpenseRowIndex = 5
 
-        // 1. Заполняем суточные (1-я строка)
+        // Сохраняем чистый XML пустой строки ДО заполнения данных
+        val templateRow = table.getRow(firstExpenseRowIndex)
+        val cleanRowXml = templateRow?.ctRow?.xmlText()
+
+        // 1. Заполняем суточные (Строка №1)
         val row1 = table.getRow(perDiemRowIndex)
         if (row1 != null) {
             setCellText(row1, 0, "1")
@@ -104,59 +111,72 @@ object DocxGenerator {
             setCellText(row1, 4, String.format(Locale.US, "%.2f", data.perDiemSum))
         }
 
-        // 2. Заполняем чеки и билеты
-        val minRegularRows = 4
-        val totalRegularRows = maxOf(minRegularRows, data.expenses.size)
-        val templateRow = table.getRow(templateRowIndex) ?: return
-
         var currentTotalSum = data.perDiemSum
+        val expensesCount = data.expenses.size
+        val minDataRows = 6 // Гарантированный минимум отображаемых строк
 
-        for (i in 0 until totalRegularRows) {
+        val totalRowsNeeded = maxOf(minDataRows, expensesCount)
+
+        for (i in 0 until totalRowsNeeded) {
+            val rowIndex = firstExpenseRowIndex + i
             val expense = data.expenses.getOrNull(i)
-            val rowNum = (i + 2).toString()
 
-            val currentRow = if (i == 0) {
-                templateRow
+            // Проверяем, существует ли строка (до строки "Итого")
+            val currentRow = if (rowIndex < table.numberOfRows - 1) {
+                table.getRow(rowIndex)
             } else {
-                val clonedCTRow = CTRow.Factory.parse(templateRow.ctRow.xmlText())
-                val newRow = XWPFTableRow(clonedCTRow, table)
-                table.addRow(newRow, templateRowIndex + i)
-                newRow
+                if (cleanRowXml != null) {
+                    val clonedCTRow = CTRow.Factory.parse(cleanRowXml)
+                    val newRow = XWPFTableRow(clonedCTRow, table)
+                    table.addRow(newRow, rowIndex)
+                    newRow
+                } else null
             }
 
-            if (expense != null) {
-                setCellText(currentRow, 0, rowNum)
-                setCellText(currentRow, 1, expense.date)
-                setCellText(currentRow, 2, expense.docNumber)
-                setCellText(currentRow, 3, expense.name)
-                setCellText(currentRow, 4, String.format(Locale.US, "%.2f", expense.sum))
-                currentTotalSum += expense.sum
-            } else {
-                setCellText(currentRow, 0, rowNum)
-                setCellText(currentRow, 1, "")
-                setCellText(currentRow, 2, "")
-                setCellText(currentRow, 3, "")
-                setCellText(currentRow, 4, "")
+            if (currentRow != null) {
+                if (expense != null) {
+                    setCellText(currentRow, 0, (i + 2).toString())
+                    setCellText(currentRow, 1, expense.date)
+                    setCellText(currentRow, 2, expense.docNumber)
+                    setCellText(currentRow, 3, expense.name)
+                    setCellText(currentRow, 4, String.format(Locale.US, "%.2f", expense.sum))
+                    currentTotalSum += expense.sum
+                } else {
+                    // Явно очищаем пустые строки
+                    for (c in 0 until currentRow.tableCells.size) {
+                        setCellText(currentRow, c, "")
+                    }
+                }
             }
         }
 
         // 3. Заполняем строку "Итого"
         val totalRow = table.getRow(table.numberOfRows - 1)
         if (totalRow != null) {
-            val totalCellIndex = 4
-            setCellText(totalRow, totalCellIndex, String.format(Locale.US, "%.2f", currentTotalSum))
+            // В строке "Итого" первые ячейки объединены. Индекс 1 попадает ровно под колонку 5 ("в руб. коп.")
+            setCellText(totalRow, 1, String.format(Locale.US, "%.2f", currentTotalSum))
         }
     }
 
     private fun setCellText(row: XWPFTableRow?, cellIndex: Int, text: String) {
         if (row == null) return
         val cell = row.getCell(cellIndex) ?: return
+        
         while (cell.paragraphs.size > 1) {
             cell.removeParagraph(1)
         }
         val p = cell.paragraphs.firstOrNull() ?: cell.addParagraph()
-        p.runs.forEach { it.setText("", 0) }
         
+        // Полностью очищаем старые текстовые блоки
+        p.runs.forEach { it.setText("", 0) }
+
+        if (text.isEmpty()) {
+            if (p.runs.isNotEmpty()) {
+                p.runs[0].setText("", 0)
+            }
+            return
+        }
+
         val run = if (p.runs.isNotEmpty()) p.runs[0] else p.createRun()
         
         if (text.contains("\n")) {
