@@ -53,7 +53,8 @@ object DocxGenerator {
         r.setText("УТВЕРЖДАЮ")
         pUtv.createRun().addBreak()
 
-        val pSum = cellLeft.createParagraph()
+        // ИСПРАВЛЕНО: addParagraph() вместо createParagraph()
+        val pSum = cellLeft.addParagraph()
         r = pSum.createRun()
         r.setText("Отчет в сумме ______________________________________")
         pSum.createRun().addBreak()
@@ -62,7 +63,8 @@ object DocxGenerator {
         r.setText("______________________ руб. _____ коп.")
         pSum.createRun().addBreak()
 
-        val pRuk = cellLeft.createParagraph()
+        // ИСПРАВЛЕНО: addParagraph() вместо createParagraph()
+        val pRuk = cellLeft.addParagraph()
         r = pRuk.createRun()
         r.setText("Руководитель _____________________________________")
         pRuk.createRun().addBreak()
@@ -72,7 +74,8 @@ object DocxGenerator {
         r.setText("                                         должность")
         pRuk.createRun().addBreak()
 
-        val pSig = cellLeft.createParagraph()
+        // ИСПРАВЛЕНО: addParagraph() вместо createParagraph()
+        val pSig = cellLeft.addParagraph()
         r = pSig.createRun()
         r.setText("_________________   ________________________")
         pSig.createRun().addBreak()
