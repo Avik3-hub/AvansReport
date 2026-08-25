@@ -4,6 +4,9 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,12 +25,13 @@ jobs:
           gradle-version: '8.5'
 
       - name: Build Debug APK
-        timeout-minutes: 10
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v2
         with:
-          name: avans-report-app
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 1
+          tag_name: v1.0.${{ github.run_number }}
+          name: Build v1.0.${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
