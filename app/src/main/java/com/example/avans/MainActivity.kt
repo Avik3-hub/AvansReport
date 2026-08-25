@@ -15,7 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,9 +25,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -44,7 +45,6 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
 
-            // Настройка цвета статусной строки и навигации Android
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
@@ -57,7 +57,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Мягкая синяя палитра (Soft Blue)
             val oledDarkColorScheme = darkColorScheme(
                 primary = Color(0xFF90CAF9),
                 secondary = Color(0xFF64B5F6),
@@ -108,22 +107,38 @@ fun AvansReportScreen(
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
     var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
 
-    var reportDate by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))) }
-    var destinationCity by remember { mutableStateOf("Вологду") }
-    
-    var startDate by remember { mutableStateOf("") }
-    var endDate by remember { mutableStateOf("") }
-    var selectedRegion by remember { mutableStateOf(Region.SOUTH) }
-    
+    var reportDate by remember {
+        mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
+    }
+    var destinationCity by remember {
+        mutableStateOf(prefs.getString("draft_destination_city", "Вологду") ?: "Вологду")
+    }
+    var startDate by remember {
+        mutableStateOf(prefs.getString("draft_start_date", "") ?: "")
+    }
+    var endDate by remember {
+        mutableStateOf(prefs.getString("draft_end_date", "") ?: "")
+    }
+    var selectedRegion by remember {
+        val regionStr = prefs.getString("draft_region", Region.SOUTH.name)
+        mutableStateOf(if (regionStr == Region.NORTH.name) Region.NORTH else Region.SOUTH)
+    }
+    var expenses by remember {
+        mutableStateOf(loadDraftExpenses(prefs))
+    }
+
+    LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
+        saveDraft(prefs, reportDate, destinationCity, startDate, endDate, selectedRegion, expenses)
+    }
+
     val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
-
-    var expenses by remember { mutableStateOf(listOf<ExpenseItem>()) }
 
     Scaffold(
         topBar = {
@@ -134,14 +149,42 @@ fun AvansReportScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
-                    IconButton(onClick = onThemeToggle) {
-                        Text(
-                            text = if (isDarkMode) "☀️" else "🌙",
-                            fontSize = 20.sp
-                        )
+                    IconButton(onClick = { showMenu = !showMenu }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Меню")
                     }
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Настройки суточных")
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Настройки суточных") },
+                            onClick = {
+                                showMenu = false
+                                showSettingsDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Text(if (isDarkMode) "Тема оформления: светлая" else "Тема оформления: темная") 
+                            },
+                            onClick = {
+                                showMenu = false
+                                onThemeToggle()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Сброс заполнения") },
+                            onClick = {
+                                showMenu = false
+                                reportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                                destinationCity = ""
+                                startDate = ""
+                                endDate = ""
+                                selectedRegion = Region.SOUTH
+                                expenses = emptyList()
+                                Toast.makeText(context, "Черновик очищен", Toast.LENGTH_SHORT).show()
+                            }
+                        )
                     }
                 }
             )
@@ -514,6 +557,57 @@ fun SettingsDialog(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
+}
+
+fun saveDraft(
+    prefs: android.content.SharedPreferences,
+    reportDate: String,
+    destinationCity: String,
+    startDate: String,
+    endDate: String,
+    region: Region,
+    expenses: List<ExpenseItem>
+) {
+    val jsonArray = JSONArray()
+    expenses.forEach { item ->
+        val obj = JSONObject()
+        obj.put("date", item.date)
+        obj.put("docNumber", item.docNumber)
+        obj.put("name", item.name)
+        obj.put("sum", item.sum)
+        jsonArray.put(obj)
+    }
+
+    prefs.edit()
+        .putString("draft_report_date", reportDate)
+        .putString("draft_destination_city", destinationCity)
+        .putString("draft_start_date", startDate)
+        .putString("draft_end_date", endDate)
+        .putString("draft_region", region.name)
+        .putString("draft_expenses", jsonArray.toString())
+        .apply()
+}
+
+fun loadDraftExpenses(prefs: android.content.SharedPreferences): List<ExpenseItem> {
+    val jsonStr = prefs.getString("draft_expenses", null) ?: return emptyList()
+    return try {
+        val array = JSONArray(jsonStr)
+        val list = mutableListOf<ExpenseItem>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            list.add(
+                ExpenseItem(
+                    date = obj.optString("date", ""),
+                    docNumber = obj.optString("docNumber", ""),
+                    name = obj.optString("name", ""),
+                    sum = obj.optDouble("sum", 0.0)
+                )
+            )
+        }
+        list
+    } catch (e: Exception) {
+        emptyList()
+    }
 }
 
 fun loadHistory(prefs: android.content.SharedPreferences, key: String): List<String> {
