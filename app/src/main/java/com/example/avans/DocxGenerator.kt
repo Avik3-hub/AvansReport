@@ -28,20 +28,16 @@ data class ReportData(
 object DocxGenerator {
 
     fun generateReport(context: Context, data: ReportData, outputFile: File) {
-        // 1. Открываем шаблон из assets
         context.assets.open("template.docx").use { inputStream ->
             val doc = XWPFDocument(inputStream)
 
-            // 2. Заполняем текстовые метки на 1-й странице
             replaceTextPlaceholders(doc, data)
 
-            // 3. Заполняем таблицу на 2-й странице
             if (doc.tables.size > 1) {
-                val table = doc.tables[1] // Вторая таблица (оборотная сторона)
+                val table = doc.tables[1]
                 fillExpensesTable(table, data)
             }
 
-            // 4. Сохраняем готовый документ
             FileOutputStream(outputFile).use { out ->
                 doc.write(out)
             }
@@ -55,12 +51,10 @@ object DocxGenerator {
             "{{purpose}}" to data.purpose
         )
 
-        // 1. Поиск и замена в обычных абзацах
         for (paragraph in doc.paragraphs) {
             replaceInParagraph(paragraph, replacements)
         }
 
-        // 2. Поиск и замена во всех таблицах (включая таблицы 1-й страницы!)
         for (table in doc.tables) {
             for (row in table.rows) {
                 for (cell in row.tableCells) {
@@ -89,18 +83,18 @@ object DocxGenerator {
         val perDiemRowIndex = 3
         val templateRowIndex = 4
 
-        // 1. Заполняем Строку 1 (Суточные)
         val row1 = table.getRow(perDiemRowIndex)
-        setCellText(row1, 0, "1")
-        setCellText(row1, 1, "${data.startDate}\n${data.endDate}")
-        setCellText(row1, 2, "-")
-        setCellText(row1, 3, "Суточные")
-        setCellText(row1, 4, String.format(Locale.US, "%.2f", data.perDiemSum))
+        if (row1 != null) {
+            setCellText(row1, 0, "1")
+            setCellText(row1, 1, "${data.startDate}\n${data.endDate}")
+            setCellText(row1, 2, "-")
+            setCellText(row1, 3, "Суточные")
+            setCellText(row1, 4, String.format(Locale.US, "%.2f", data.perDiemSum))
+        }
 
-        // 2. Вычисляем количество обычных строк (минимум 4, чтобы всего было >= 5)
         val minRegularRows = 4
         val totalRegularRows = maxOf(minRegularRows, data.expenses.size)
-        val templateRow = table.getRow(templateRowIndex)
+        val templateRow = table.getRow(templateRowIndex) ?: return
 
         var currentTotalSum = data.perDiemSum
 
@@ -108,7 +102,6 @@ object DocxGenerator {
             val expense = data.expenses.getOrNull(i)
             val rowNum = (i + 2).toString()
 
-            // Клонируем эталонную строку со всеми стилями и рамками
             val currentRow = if (i == 0) {
                 templateRow
             } else {
@@ -134,18 +127,20 @@ object DocxGenerator {
             }
         }
 
-        // 3. Обновляем строку "Итого"
         val totalRow = table.getRow(table.numberOfRows - 1)
-        val totalCellIndex = 4
-        setCellText(totalRow, totalCellIndex, String.format(Locale.US, "%.2f", currentTotalSum))
+        if (totalRow != null) {
+            val totalCellIndex = 4
+            setCellText(totalRow, totalCellIndex, String.format(Locale.US, "%.2f", currentTotalSum))
+        }
     }
 
-    private fun setCellText(row: XWPFTableRow, cellIndex: Int, text: String) {
+    private fun setCellText(row: XWPFTableRow?, cellIndex: Int, text: String) {
+        if (row == null) return
         val cell = row.getCell(cellIndex) ?: return
         while (cell.paragraphs.size > 1) {
             cell.removeParagraph(1)
         }
-        val p = cell.paragraphs[0]
+        val p = cell.paragraphs.firstOrNull() ?: cell.addParagraph()
         p.runs.forEach { it.setText("", 0) }
         
         val run = if (p.runs.isNotEmpty()) p.runs[0] else p.createRun()
