@@ -12,13 +12,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -32,48 +35,74 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            val context = LocalContext.current
+            val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+            var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
+
+            // Цветовая палитра OLED (глубокий черный #000000)
+            val oledDarkColorScheme = darkColorScheme(
+                primary = Color(0xFFD0BCFF),
+                secondary = Color(0xFFCCC2DC),
+                background = Color(0xFF000000),
+                surface = Color(0xFF121212),
+                surfaceVariant = Color(0xFF1F1F1F),
+                onBackground = Color(0xFFE6E1E5),
+                onSurface = Color(0xFFE6E1E5),
+                onSurfaceVariant = Color(0xFFCAC4D0)
+            )
+
+            val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme()
+
+            MaterialTheme(colorScheme = colorScheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AvansReportScreen()
+                    AvansReportScreen(
+                        isDarkMode = isDarkMode,
+                        onThemeToggle = {
+                            isDarkMode = !isDarkMode
+                            prefs.edit().putBoolean("is_dark_mode", isDarkMode).apply()
+                        }
+                    )
                 }
             }
         }
     }
 }
 
-enum class Region(val title: String) {
-    SOUTH("Юг"),
-    NORTH("Север")
-}
+enum class Region { SOUTH, NORTH }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AvansReportScreen() {
+fun AvansReportScreen(
+    isDarkMode: Boolean,
+    onThemeToggle: () -> Unit
+) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
 
-    // Ставки суточных (сохраняются в настройках)
+    // Настройки ставок
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
+    // История для автозаполнения
+    var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
+    var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
+
     // Основные поля отчета
     var reportDate by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))) }
-    var purpose by remember { mutableStateOf("Командировка") }
+    var destinationCity by remember { mutableStateOf("Вологду") }
     
     // Суточные
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
     var selectedRegion by remember { mutableStateOf(Region.SOUTH) }
     
-    // Авторасчет суточных
     val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
@@ -86,6 +115,12 @@ fun AvansReportScreen() {
             TopAppBar(
                 title = { Text("Авансовый отчет АО-1") },
                 actions = {
+                    IconButton(onClick = onThemeToggle) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Переключить тему"
+                        )
+                    }
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Настройки суточных")
                     }
@@ -100,7 +135,7 @@ fun AvansReportScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Общая информация
+            // 1. Основные данные
             item {
                 Text("1. Основные данные", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -112,11 +147,12 @@ fun AvansReportScreen() {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                OutlinedTextField(
-                    value = purpose,
-                    onValueChange = { purpose = it },
-                    label = { Text("Назначение аванса") },
-                    modifier = Modifier.fillMaxWidth()
+                AutoCompleteTextField(
+                    value = destinationCity,
+                    onValueChange = { destinationCity = it },
+                    label = "Место назначения",
+                    prefixText = "Командировка в ",
+                    history = destinationHistory
                 )
             }
 
@@ -171,7 +207,7 @@ fun AvansReportScreen() {
                 }
             }
 
-            // 3. Расходы (Чеки и билеты)
+            // 3. Чеки и билеты
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -191,6 +227,7 @@ fun AvansReportScreen() {
                 ExpenseCard(
                     index = index + 2,
                     expense = expense,
+                    nameHistory = expenseNameHistory,
                     onUpdate = { updated ->
                         val newList = expenses.toMutableList()
                         newList[index] = updated
@@ -209,9 +246,17 @@ fun AvansReportScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
+                        val fullPurpose = "Командировка в $destinationCity".trim()
+                        
+                        // Сохранение в историю
+                        destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
+                        expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
+                            expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
+                        }
+
                         val data = ReportData(
                             reportDate = reportDate,
-                            purpose = purpose,
+                            purpose = fullPurpose,
                             startDate = startDate,
                             endDate = endDate,
                             perDiemSum = perDiemSum,
@@ -229,7 +274,6 @@ fun AvansReportScreen() {
         }
     }
 
-    // Диалог настроек ставок
     if (showSettingsDialog) {
         SettingsDialog(
             currentSouth = southRate,
@@ -245,6 +289,59 @@ fun AvansReportScreen() {
                 showSettingsDialog = false
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AutoCompleteTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    prefixText: String? = null,
+    history: List<String>,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val filteredHistory = remember(value, history) {
+        if (value.isBlank()) history else history.filter { it.contains(value, ignoreCase = true) }
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && filteredHistory.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+                expanded = true
+            },
+            label = { Text(label) },
+            prefix = prefixText?.let { { Text(it) } },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            singleLine = true
+        )
+
+        if (filteredHistory.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                filteredHistory.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(item) },
+                        onClick = {
+                            onValueChange(item)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -306,6 +403,7 @@ fun DatePickerField(
 fun ExpenseCard(
     index: Int,
     expense: ExpenseItem,
+    nameHistory: List<String>,
     onUpdate: (ExpenseItem) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -340,12 +438,14 @@ fun ExpenseCard(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
+            
+            AutoCompleteTextField(
                 value = expense.name,
-                onValueChange = { onUpdate(expense.copy(name = it)) },
-                label = { Text("Наименование расхода") },
-                modifier = Modifier.fillMaxWidth()
+                onValueChange = { name -> onUpdate(expense.copy(name = name)) },
+                label = "Наименование расхода",
+                history = nameHistory
             )
+
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = if (expense.sum == 0.0) "" else expense.sum.toString(),
@@ -400,6 +500,19 @@ fun SettingsDialog(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
+}
+
+fun loadHistory(prefs: android.content.SharedPreferences, key: String): List<String> {
+    val set = prefs.getStringSet(key, emptySet()) ?: emptySet()
+    return set.toList()
+}
+
+fun saveHistoryItem(prefs: android.content.SharedPreferences, key: String, item: String): List<String> {
+    if (item.isBlank()) return loadHistory(prefs, key)
+    val current = prefs.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
+    current.add(item.trim())
+    prefs.edit().putStringSet(key, current).apply()
+    return current.toList()
 }
 
 fun calculateDays(startDateStr: String, endDateStr: String): Long {
