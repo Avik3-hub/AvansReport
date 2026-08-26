@@ -129,15 +129,13 @@ object DocxGenerator {
             }
         } ?: return
 
+        // Поиск строки нумерации (1 2 3 4 5 6 7 8 9)
         val numberingRowIndex = expenseTable.rows.indexOfFirst { row ->
             val texts = row.tableCells.map { it.text.trim() }
             texts.contains("6") && texts.contains("7") && texts.contains("8") && texts.contains("9")
         }
 
         val startDataRowIndex = if (numberingRowIndex != -1) numberingRowIndex + 1 else 3
-
-        val sampleRow = expenseTable.rows.getOrNull(startDataRowIndex)
-        val sampleHeight = if (sampleRow != null && sampleRow.height > 0) sampleRow.height else 380
 
         val allItems = mutableListOf<ExpenseItem>()
         allItems.add(
@@ -153,19 +151,40 @@ object DocxGenerator {
         val minRows = 5
         val totalRowsToDisplay = maxOf(minRows, allItems.size)
 
+        // Поиск строки "Итого"
+        var totalRowIndex = expenseTable.rows.indexOfFirst { row ->
+            row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
+        }
+
+        val existingDataRowsCount = if (totalRowIndex != -1) totalRowIndex - startDataRowIndex else 0
+
+        // Удаление лишних строк из шаблона или добавление недостающих
+        if (existingDataRowsCount > totalRowsToDisplay) {
+            val rowsToRemove = existingDataRowsCount - totalRowsToDisplay
+            for (r in 0 until rowsToRemove) {
+                expenseTable.removeRow(startDataRowIndex + totalRowsToDisplay)
+            }
+        } else if (existingDataRowsCount < totalRowsToDisplay) {
+            val rowsToInsert = totalRowsToDisplay - existingDataRowsCount
+            for (r in 0 until rowsToInsert) {
+                val currentTotalIdx = expenseTable.rows.indexOfFirst { row ->
+                    row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
+                }
+                if (currentTotalIdx != -1) {
+                    expenseTable.insertNewTableRow(currentTotalIdx)
+                }
+            }
+        }
+
+        // Высота строки по умолчанию
+        val sampleRow = expenseTable.rows.getOrNull(startDataRowIndex)
+        val sampleHeight = if (sampleRow != null && sampleRow.height > 0) sampleRow.height else 380
+
         var totalSum = 0.0
 
         for (i in 0 until totalRowsToDisplay) {
             val targetRowIndex = startDataRowIndex + i
-
-            val currentRow = expenseTable.rows.getOrNull(targetRowIndex)
-            val isTotalRow = currentRow?.tableCells?.any { it.text.contains("Итого", ignoreCase = true) } == true
-
-            val row = if (isTotalRow || targetRowIndex >= expenseTable.rows.size) {
-                expenseTable.insertNewTableRow(targetRowIndex)
-            } else {
-                expenseTable.getRow(targetRowIndex)
-            }
+            val row = expenseTable.getRow(targetRowIndex) ?: continue
 
             row.height = sampleHeight
 
@@ -178,28 +197,30 @@ object DocxGenerator {
                 totalSum += item.sum
 
                 val sumText = if (item.sum > 0) String.format(Locale.US, "%.2f", item.sum) else "-"
-                val sumAlign = if (item.sum > 0) ParagraphAlignment.RIGHT else ParagraphAlignment.CENTER
                 val docNumText = item.docNumber.ifBlank { "-" }
 
                 setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(1), item.date, ParagraphAlignment.CENTER)
                 setCellText(row.getCell(2), docNumText, ParagraphAlignment.CENTER)
-                setCellText(row.getCell(3), item.name, ParagraphAlignment.LEFT)
-                setCellText(row.getCell(4), sumText, sumAlign)
+                setCellText(row.getCell(3), item.name, ParagraphAlignment.CENTER) // 4-й столбец по центру
+                setCellText(row.getCell(4), sumText, ParagraphAlignment.CENTER)   // 5-й столбец по центру
             } else {
+                // Пустые строки для выравнивания бланка (минимум 5 строк)
                 setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(1), "", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(2), "", ParagraphAlignment.CENTER)
-                setCellText(row.getCell(3), "", ParagraphAlignment.LEFT)
-                setCellText(row.getCell(4), "", ParagraphAlignment.RIGHT)
+                setCellText(row.getCell(3), "", ParagraphAlignment.CENTER)
+                setCellText(row.getCell(4), "", ParagraphAlignment.CENTER)
             }
 
+            // Очистка и центрирование неиспользуемых колонок (5..8)
             for (c in 5..8) {
                 setCellText(row.getCell(c), "", ParagraphAlignment.CENTER)
             }
         }
 
-        val totalRowIndex = expenseTable.rows.indexOfFirst { row ->
+        // Заполнение строки "Итого"
+        totalRowIndex = expenseTable.rows.indexOfFirst { row ->
             row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
         }
 
@@ -209,9 +230,9 @@ object DocxGenerator {
             val sumStr = String.format(Locale.US, "%.2f", totalSum)
 
             if (totalRow.tableCells.size < 9) {
-                setCellText(totalRow.getCell(1), sumStr, ParagraphAlignment.RIGHT, isBold = true)
+                setCellText(totalRow.getCell(1), sumStr, ParagraphAlignment.CENTER, isBold = true)
             } else {
-                setCellText(totalRow.getCell(4), sumStr, ParagraphAlignment.RIGHT, isBold = true)
+                setCellText(totalRow.getCell(4), sumStr, ParagraphAlignment.CENTER, isBold = true)
             }
         }
     }
