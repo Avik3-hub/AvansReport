@@ -8,6 +8,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTable
 import org.apache.poi.xwpf.usermodel.XWPFTableCell
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 data class ExpenseItem(
     val date: String,
@@ -96,20 +97,17 @@ object DocxGenerator {
         }
 
         if (updated) {
-            // 1. Считываем и сохраняем форматирование из оригинального элемента Word
             val firstRun = paragraph.runs.firstOrNull()
             val fontFamily = firstRun?.fontFamily
-            val fontSize = firstRun?.fontSize // Используем Int для корректного совпадения типов
+            val fontSize = firstRun?.fontSize
             val isBold = firstRun?.isBold ?: false
             val isItalic = firstRun?.isItalic ?: false
             val underline = firstRun?.underline
 
-            // 2. Очищаем старый текст
             for (i in paragraph.runs.size - 1 downTo 0) {
                 paragraph.removeRun(i)
             }
 
-            // 3. Создаем новый элемент и точно воспроизводим шрифт и стили оригинала
             val newRun = paragraph.createRun()
             if (fontFamily != null) newRun.fontFamily = fontFamily
             if (fontSize != null && fontSize > 0) newRun.fontSize = fontSize
@@ -131,7 +129,6 @@ object DocxGenerator {
             }
         } ?: return
 
-        // Поиск строки нумерации (1 2 3 4 5 6 7 8 9)
         val numberingRowIndex = expenseTable.rows.indexOfFirst { row ->
             val texts = row.tableCells.map { it.text.trim() }
             texts.contains("6") && texts.contains("7") && texts.contains("8") && texts.contains("9")
@@ -139,7 +136,6 @@ object DocxGenerator {
 
         val startDataRowIndex = if (numberingRowIndex != -1) numberingRowIndex + 1 else 3
 
-        // Эталонная высота строки
         val sampleRow = expenseTable.rows.getOrNull(startDataRowIndex)
         val sampleHeight = if (sampleRow != null && sampleRow.height > 0) sampleRow.height else 380
 
@@ -154,7 +150,6 @@ object DocxGenerator {
         )
         allItems.addAll(data.expenses)
 
-        // Гарантируем минимум 5 строк
         val minRows = 5
         val totalRowsToDisplay = maxOf(minRows, allItems.size)
 
@@ -172,7 +167,6 @@ object DocxGenerator {
                 expenseTable.getRow(targetRowIndex)
             }
 
-            // Устанавливаем единую высоту строки
             row.height = sampleHeight
 
             while (row.tableCells.size < 9) {
@@ -182,13 +176,17 @@ object DocxGenerator {
             if (i < allItems.size) {
                 val item = allItems[i]
                 totalSum += item.sum
+
+                val sumText = if (item.sum > 0) String.format(Locale.US, "%.2f", item.sum) else "-"
+                val sumAlign = if (item.sum > 0) ParagraphAlignment.RIGHT else ParagraphAlignment.CENTER
+                val docNumText = item.docNumber.ifBlank { "-" }
+
                 setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(1), item.date, ParagraphAlignment.CENTER)
-                setCellText(row.getCell(2), item.docNumber, ParagraphAlignment.CENTER)
+                setCellText(row.getCell(2), docNumText, ParagraphAlignment.CENTER)
                 setCellText(row.getCell(3), item.name, ParagraphAlignment.LEFT)
-                setCellText(row.getCell(4), String.format("%.2f", item.sum), ParagraphAlignment.RIGHT)
+                setCellText(row.getCell(4), sumText, sumAlign)
             } else {
-                // Пустые строки для выравнивания бланка
                 setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(1), "", ParagraphAlignment.CENTER)
                 setCellText(row.getCell(2), "", ParagraphAlignment.CENTER)
@@ -196,13 +194,11 @@ object DocxGenerator {
                 setCellText(row.getCell(4), "", ParagraphAlignment.RIGHT)
             }
 
-            // Очистка и центрирование неиспользуемых колонок валюты/дебета (5..8)
             for (c in 5..8) {
                 setCellText(row.getCell(c), "", ParagraphAlignment.CENTER)
             }
         }
 
-        // Заполнение строки "Итого"
         val totalRowIndex = expenseTable.rows.indexOfFirst { row ->
             row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
         }
@@ -210,7 +206,7 @@ object DocxGenerator {
         if (totalRowIndex != -1) {
             val totalRow = expenseTable.getRow(totalRowIndex)
             totalRow.height = sampleHeight
-            val sumStr = String.format("%.2f", totalSum)
+            val sumStr = String.format(Locale.US, "%.2f", totalSum)
 
             if (totalRow.tableCells.size < 9) {
                 setCellText(totalRow.getCell(1), sumStr, ParagraphAlignment.RIGHT, isBold = true)
@@ -228,7 +224,6 @@ object DocxGenerator {
     ) {
         if (cell == null) return
 
-        // Выравнивание по вертикали
         cell.verticalAlignment = XWPFTableCell.XWPFVertAlign.CENTER
 
         val p = if (cell.paragraphs.isNotEmpty()) cell.paragraphs[0] else cell.addParagraph()
