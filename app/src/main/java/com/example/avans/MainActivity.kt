@@ -50,7 +50,6 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
-
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
@@ -62,7 +61,6 @@ class MainActivity : ComponentActivity() {
                     insetsController.isAppearanceLightNavigationBars = !isDarkMode
                 }
             }
-
             val oledDarkColorScheme = darkColorScheme(
                 primary = Color(0xFF90CAF9),
                 secondary = Color(0xFF64B5F6),
@@ -73,14 +71,11 @@ class MainActivity : ComponentActivity() {
                 onSurface = Color(0xFFE6E1E5),
                 onSurfaceVariant = Color(0xFFCAC4D0)
             )
-
             val lightColorScheme = lightColorScheme(
                 primary = Color(0xFF1976D2),
                 secondary = Color(0xFF0288D1)
             )
-
             val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme
-
             MaterialTheme(colorScheme = colorScheme) {
                 MainAppPager(
                     isDarkMode = isDarkMode,
@@ -101,7 +96,6 @@ fun MainAppPager(
     onThemeToggle: () -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 2 })
-
     Column(modifier = Modifier.fillMaxSize()) {
         HorizontalPager(
             state = pagerState,
@@ -117,8 +111,6 @@ fun MainAppPager(
                 }
             }
         }
-
-        // Индикатор горизонтального скролла внизу экрана
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -151,6 +143,155 @@ fun MainAppPager(
     }
 }
 
+data class FlightLegInput(
+    val depDate: String = "",
+    val arrDate: String = "",
+    val from: String = "",
+    val to: String = "",
+    val taskNumber: String = ""
+)
+
+@Composable
+fun FlightDetailsBlock() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    var legs by remember { mutableStateOf(loadDraftLegs(prefs)) }
+
+    LaunchedEffect(legs) {
+        saveDraftLegs(prefs, legs)
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Перелеты", style = MaterialTheme.typography.titleLarge)
+                Button(onClick = {
+                    if (legs.size < 7) {
+                        legs = legs + FlightLegInput()
+                    } else {
+                        Toast.makeText(context, "Максимум 7 перелетов", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("+ Перелет")
+                }
+            }
+        }
+
+        if (legs.isEmpty()) {
+            item {
+                Text(
+                    text = "Список перелетов пуст. Нажмите «+ Перелет» для добавления.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        itemsIndexed(legs) { index, leg ->
+            FlightLegCard(
+                index = index + 1,
+                leg = leg,
+                onUpdate = { updated ->
+                    val newList = legs.toMutableList()
+                    newList[index] = updated
+                    legs = newList
+                },
+                onDelete = {
+                    val newList = legs.toMutableList()
+                    newList.removeAt(index)
+                    legs = newList
+                }
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { generateAndOpenMemo(context, legs) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Text("Сформировать и открыть .xlsx")
+            }
+        }
+    }
+}
+
+@Composable
+fun FlightLegCard(
+    index: Int,
+    leg: FlightLegInput,
+    onUpdate: (FlightLegInput) -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Перелет No$index", style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DatePickerField(
+                    label = "Убытие:",
+                    value = leg.depDate,
+                    onDateSelected = { onUpdate(leg.copy(depDate = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+                DatePickerField(
+                    label = "Прибытие:",
+                    value = leg.arrDate,
+                    onDateSelected = { onUpdate(leg.copy(arrDate = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.from,
+                onValueChange = { onUpdate(leg.copy(from = it)) },
+                label = { Text("Откуда") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.to,
+                onValueChange = { onUpdate(leg.copy(to = it)) },
+                label = { Text("Куда") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.taskNumber,
+                onValueChange = { onUpdate(leg.copy(taskNumber = it)) },
+                label = { Text("No Полетного задания") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
 enum class Region { SOUTH, NORTH }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,19 +304,15 @@ fun AvansReportScreen(
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
-
-    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин С. В.") ?: "Нагибин С. В.") }
+    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович") }
     var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
-    var position by remember { mutableStateOf(prefs.getString("emp_position", "авиатехник по АиРЭО") ?: "авиатехник по АиРЭО") }
+    var position by remember { mutableStateOf(prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО") }
     var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
-
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showEmployeeDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
-
     var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
     var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
-
     var reportDate by remember {
         mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
     }
@@ -195,15 +332,12 @@ fun AvansReportScreen(
     var expenses by remember {
         mutableStateOf(loadDraftExpenses(prefs))
     }
-
     LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
         saveDraft(prefs, reportDate, destinationCity, startDate, endDate, selectedRegion, expenses)
     }
-
     val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -287,7 +421,6 @@ fun AvansReportScreen(
                     history = destinationHistory
                 )
             }
-
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -295,7 +428,6 @@ fun AvansReportScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("2. Суточные (1-я строка таблицы)", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(12.dp))
-
                         Text("Выбор региона:", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -312,7 +444,6 @@ fun AvansReportScreen(
                                 label = { Text("Север (${northRate.toInt()} ₽/день)") }
                             )
                         }
-
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             DatePickerField(
                                 label = "Дата начала",
@@ -327,7 +458,6 @@ fun AvansReportScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "Дней: $daysCount | Сумма: ${String.format(Locale.US, "%.2f", perDiemSum)} ₽",
@@ -337,7 +467,6 @@ fun AvansReportScreen(
                     }
                 }
             }
-
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -352,7 +481,6 @@ fun AvansReportScreen(
                     }
                 }
             }
-
             itemsIndexed(expenses) { index, expense ->
                 ExpenseCard(
                     index = index + 2,
@@ -370,7 +498,6 @@ fun AvansReportScreen(
                     }
                 )
             }
-
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
@@ -381,7 +508,6 @@ fun AvansReportScreen(
                         expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
                             expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
                         }
-
                         val data = ReportData(
                             reportDate = reportDate,
                             purpose = fullPurpose,
@@ -390,7 +516,7 @@ fun AvansReportScreen(
                             perDiemSum = perDiemSum,
                             expenses = expenses,
                             employee = EmployeeInfo(
-                                name = employeeName,
+                                name = employeeName.toShortName(),
                                 tabNumber = tabNumber,
                                 position = position,
                                 department = department
@@ -407,7 +533,6 @@ fun AvansReportScreen(
             }
         }
     }
-
     if (showEmployeeDialog) {
         EmployeeDialog(
             currentName = employeeName,
@@ -430,7 +555,6 @@ fun AvansReportScreen(
             }
         )
     }
-
     if (showSettingsDialog) {
         SettingsDialog(
             currentSouth = southRate,
@@ -462,7 +586,6 @@ fun EmployeeDialog(
     var tabNumber by remember { mutableStateOf(currentTabNumber) }
     var position by remember { mutableStateOf(currentPosition) }
     var department by remember { mutableStateOf(currentDepartment) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Данные сотрудника") },
@@ -471,7 +594,7 @@ fun EmployeeDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Подотчетное лицо (ФИО)") },
+                    label = { Text("Подотчетное лицо (ФИО полностью)") },
                     singleLine = true
                 )
                 OutlinedTextField(
@@ -519,7 +642,6 @@ fun AutoCompleteTextField(
     val filteredHistory = remember(value, history) {
         if (value.isBlank()) history else history.filter { it.contains(value, ignoreCase = true) }
     }
-
     ExposedDropdownMenuBox(
         expanded = expanded && filteredHistory.isNotEmpty(),
         onExpandedChange = { expanded = it },
@@ -538,7 +660,6 @@ fun AutoCompleteTextField(
                 .menuAnchor(),
             singleLine = true
         )
-
         if (filteredHistory.isNotEmpty()) {
             ExposedDropdownMenu(
                 expanded = expanded,
@@ -567,7 +688,6 @@ fun DatePickerField(
     modifier: Modifier = Modifier
 ) {
     var showDialog by remember { mutableStateOf(false) }
-
     Box(modifier = modifier) {
         OutlinedTextField(
             value = value,
@@ -583,7 +703,6 @@ fun DatePickerField(
                 .clickable { showDialog = true }
         )
     }
-
     if (showDialog) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -635,7 +754,6 @@ fun ExpenseCard(
                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
                 }
             }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DatePickerField(
                     label = "Дата",
@@ -658,7 +776,6 @@ fun ExpenseCard(
                 label = "Наименование расхода",
                 history = nameHistory
             )
-
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = if (expense.sum == 0.0) "" else expense.sum.toString(),
@@ -680,7 +797,6 @@ fun SettingsDialog(
 ) {
     var southInput by remember { mutableStateOf(currentSouth.toInt().toString()) }
     var northInput by remember { mutableStateOf(currentNorth.toInt().toString()) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Настройки ставок суточных") },
@@ -715,6 +831,70 @@ fun SettingsDialog(
     )
 }
 
+fun String.toShortName(): String {
+    val parts = this.trim().split("\\s+".toRegex())
+    if (parts.isEmpty()) return ""
+    val lastName = parts[0]
+    val firstNameInitial = parts.getOrNull(1)?.firstOrNull()?.let { "$it." } ?: ""
+    val patronymicInitial = parts.getOrNull(2)?.firstOrNull()?.let { "$it." } ?: ""
+    return "$lastName $firstNameInitial$patronymicInitial".trim()
+}
+
+fun parseDateToComponents(dateStr: String): Triple<String, String, String> {
+    return try {
+        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+        val date = LocalDate.parse(dateStr, formatter)
+        val months = arrayOf(
+            "января", "февраля", "марта", "апреля", "мая", "июня",
+            "июля", "августа", "сентября", "октября", "ноября", "декабря"
+        )
+        Triple(
+            date.dayOfMonth.toString(),
+            months[date.monthValue - 1],
+            date.year.toString()
+        )
+    } catch (e: Exception) {
+        Triple("", "", "")
+    }
+}
+
+fun saveDraftLegs(prefs: android.content.SharedPreferences, legs: List<FlightLegInput>) {
+    val jsonArray = JSONArray()
+    legs.forEach { item ->
+        val obj = JSONObject()
+        obj.put("depDate", item.depDate)
+        obj.put("arrDate", item.arrDate)
+        obj.put("from", item.from)
+        obj.put("to", item.to)
+        obj.put("taskNumber", item.taskNumber)
+        jsonArray.put(obj)
+    }
+    prefs.edit().putString("draft_flight_legs", jsonArray.toString()).apply()
+}
+
+fun loadDraftLegs(prefs: android.content.SharedPreferences): List<FlightLegInput> {
+    val jsonStr = prefs.getString("draft_flight_legs", null) ?: return emptyList()
+    return try {
+        val array = JSONArray(jsonStr)
+        val list = mutableListOf<FlightLegInput>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            list.add(
+                FlightLegInput(
+                    depDate = obj.optString("depDate", ""),
+                    arrDate = obj.optString("arrDate", ""),
+                    from = obj.optString("from", ""),
+                    to = obj.optString("to", ""),
+                    taskNumber = obj.optString("taskNumber", "")
+                )
+            )
+        }
+        list
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
 fun saveDraft(
     prefs: android.content.SharedPreferences,
     reportDate: String,
@@ -733,7 +913,6 @@ fun saveDraft(
         obj.put("sum", item.sum)
         jsonArray.put(obj)
     }
-
     prefs.edit()
         .putString("draft_report_date", reportDate)
         .putString("draft_destination_city", destinationCity)
@@ -800,21 +979,70 @@ private fun generateAndOpenReport(context: Context, data: ReportData) {
             .ifEmpty { "Авансовый_отчет" }
         val fileName = "$safePurpose.docx"
         val outFile = File(context.cacheDir, fileName)
-
         DocxGenerator.generateReport(context, data, outFile)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            outFile
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
+        Toast.makeText(context, "Ошибка: $errorDetails", Toast.LENGTH_LONG).show()
+    }
+}
+
+private fun generateAndOpenMemo(context: Context, legsInput: List<FlightLegInput>) {
+    try {
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val fullName = prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович"
+        val tabNumber = prefs.getString("emp_tab_number", "8701") ?: "8701"
+        val position = prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО"
+        val department = prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов"
+
+        val memoLegs = legsInput.map { leg ->
+            val (depD, depM, depY) = parseDateToComponents(leg.depDate)
+            val (arrD, arrM, arrY) = parseDateToComponents(leg.arrDate)
+            FlightLeg(
+                from = leg.from,
+                to = leg.to,
+                depDay = depD,
+                depMonth = depM,
+                depYear = depY,
+                arrDay = arrD,
+                arrMonth = arrM,
+                arrYear = arrY,
+                taskNumber = leg.taskNumber
+            )
+        }
+
+        val memoData = MemoData(
+            employeeName = fullName,
+            position = position,
+            department = department,
+            tabNum = tabNumber,
+            legs = memoLegs
+        )
+
+        val fileName = "Убытие_прибытие.xlsx"
+        val outFile = File(context.cacheDir, fileName)
+        XlsxGenerator.generateMemo(context, memoData, outFile)
 
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
             outFile
         )
-
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-
-        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
+        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать служебную записку"))
     } catch (e: Exception) {
         e.printStackTrace()
         val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
