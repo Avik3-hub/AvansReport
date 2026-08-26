@@ -7,10 +7,13 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -44,6 +47,7 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
+
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
@@ -55,6 +59,7 @@ class MainActivity : ComponentActivity() {
                     insetsController.isAppearanceLightNavigationBars = !isDarkMode
                 }
             }
+
             val oledDarkColorScheme = darkColorScheme(
                 primary = Color(0xFF90CAF9),
                 secondary = Color(0xFF64B5F6),
@@ -65,24 +70,47 @@ class MainActivity : ComponentActivity() {
                 onSurface = Color(0xFFE6E1E5),
                 onSurfaceVariant = Color(0xFFCAC4D0)
             )
+
             val lightColorScheme = lightColorScheme(
                 primary = Color(0xFF1976D2),
                 secondary = Color(0xFF0288D1)
             )
+
             val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme
+
             MaterialTheme(colorScheme = colorScheme) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AvansReportScreen(
-                        isDarkMode = isDarkMode,
-                        onThemeToggle = {
-                            isDarkMode = !isDarkMode
-                            prefs.edit().putBoolean("is_dark_mode", isDarkMode).apply()
-                        }
-                    )
-                }
+                MainAppPager(
+                    isDarkMode = isDarkMode,
+                    onThemeToggle = {
+                        isDarkMode = !isDarkMode
+                        prefs.edit().putBoolean("is_dark_mode", isDarkMode).apply()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MainAppPager(
+    isDarkMode: Boolean,
+    onThemeToggle: () -> Unit
+) {
+    // Запуск со страницы 1 (Авансовый отчет). Свайп вправо переходит на страницу 0 (Перелеты)
+    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 2 })
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize()
+    ) { page ->
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            when (page) {
+                0 -> FlightDetailsBlock()
+                1 -> AvansReportScreen(isDarkMode = isDarkMode, onThemeToggle = onThemeToggle)
             }
         }
     }
@@ -100,17 +128,19 @@ fun AvansReportScreen(
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
     var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
     var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
-    
-    // Данные сотрудника
+
     var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин С. В.") ?: "Нагибин С. В.") }
     var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
     var position by remember { mutableStateOf(prefs.getString("emp_position", "авиатехник по АиРЭО") ?: "авиатехник по АиРЭО") }
     var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
+
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showEmployeeDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+
     var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
     var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
+
     var reportDate by remember {
         mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
     }
@@ -130,12 +160,15 @@ fun AvansReportScreen(
     var expenses by remember {
         mutableStateOf(loadDraftExpenses(prefs))
     }
+
     LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
         saveDraft(prefs, reportDate, destinationCity, startDate, endDate, selectedRegion, expenses)
     }
+
     val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -219,6 +252,7 @@ fun AvansReportScreen(
                     history = destinationHistory
                 )
             }
+
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -226,6 +260,7 @@ fun AvansReportScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("2. Суточные (1-я строка таблицы)", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(12.dp))
+
                         Text("Выбор региона:", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -242,6 +277,7 @@ fun AvansReportScreen(
                                 label = { Text("Север (${northRate.toInt()} ₽/день)") }
                             )
                         }
+
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             DatePickerField(
                                 label = "Дата начала",
@@ -256,6 +292,7 @@ fun AvansReportScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "Дней: $daysCount | Сумма: ${String.format(Locale.US, "%.2f", perDiemSum)} ₽",
@@ -265,6 +302,7 @@ fun AvansReportScreen(
                     }
                 }
             }
+
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -279,6 +317,7 @@ fun AvansReportScreen(
                     }
                 }
             }
+
             itemsIndexed(expenses) { index, expense ->
                 ExpenseCard(
                     index = index + 2,
@@ -296,6 +335,7 @@ fun AvansReportScreen(
                     }
                 )
             }
+
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
@@ -306,6 +346,7 @@ fun AvansReportScreen(
                         expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
                             expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
                         }
+
                         val data = ReportData(
                             reportDate = reportDate,
                             purpose = fullPurpose,
@@ -331,6 +372,7 @@ fun AvansReportScreen(
             }
         }
     }
+
     if (showEmployeeDialog) {
         EmployeeDialog(
             currentName = employeeName,
@@ -353,6 +395,7 @@ fun AvansReportScreen(
             }
         )
     }
+
     if (showSettingsDialog) {
         SettingsDialog(
             currentSouth = southRate,
@@ -384,6 +427,7 @@ fun EmployeeDialog(
     var tabNumber by remember { mutableStateOf(currentTabNumber) }
     var position by remember { mutableStateOf(currentPosition) }
     var department by remember { mutableStateOf(currentDepartment) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Данные сотрудника") },
@@ -440,6 +484,7 @@ fun AutoCompleteTextField(
     val filteredHistory = remember(value, history) {
         if (value.isBlank()) history else history.filter { it.contains(value, ignoreCase = true) }
     }
+
     ExposedDropdownMenuBox(
         expanded = expanded && filteredHistory.isNotEmpty(),
         onExpandedChange = { expanded = it },
@@ -458,6 +503,7 @@ fun AutoCompleteTextField(
                 .menuAnchor(),
             singleLine = true
         )
+
         if (filteredHistory.isNotEmpty()) {
             ExposedDropdownMenu(
                 expanded = expanded,
@@ -486,6 +532,7 @@ fun DatePickerField(
     modifier: Modifier = Modifier
 ) {
     var showDialog by remember { mutableStateOf(false) }
+
     Box(modifier = modifier) {
         OutlinedTextField(
             value = value,
@@ -501,6 +548,7 @@ fun DatePickerField(
                 .clickable { showDialog = true }
         )
     }
+
     if (showDialog) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -552,6 +600,7 @@ fun ExpenseCard(
                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
                 }
             }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DatePickerField(
                     label = "Дата",
@@ -574,6 +623,7 @@ fun ExpenseCard(
                 label = "Наименование расхода",
                 history = nameHistory
             )
+
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = if (expense.sum == 0.0) "" else expense.sum.toString(),
@@ -595,6 +645,7 @@ fun SettingsDialog(
 ) {
     var southInput by remember { mutableStateOf(currentSouth.toInt().toString()) }
     var northInput by remember { mutableStateOf(currentNorth.toInt().toString()) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Настройки ставок суточных") },
@@ -647,6 +698,7 @@ fun saveDraft(
         obj.put("sum", item.sum)
         jsonArray.put(obj)
     }
+
     prefs.edit()
         .putString("draft_report_date", reportDate)
         .putString("draft_destination_city", destinationCity)
@@ -711,21 +763,22 @@ private fun generateAndOpenReport(context: Context, data: ReportData) {
             .replace(Regex("[\\\\/:*?\"<>|]"), "_")
             .trim()
             .ifEmpty { "Авансовый_отчет" }
-
         val fileName = "$safePurpose.docx"
         val outFile = File(context.cacheDir, fileName)
-        
+
         DocxGenerator.generateReport(context, data, outFile)
-        
+
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
             outFile
         )
+
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+
         context.startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
     } catch (e: Exception) {
         e.printStackTrace()
