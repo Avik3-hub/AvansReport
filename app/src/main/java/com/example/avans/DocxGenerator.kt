@@ -85,43 +85,41 @@ object DocxGenerator {
     }
 
     private fun replaceTextInParagraph(paragraph: XWPFParagraph, replacements: Map<String, String>) {
-    private fun replaceTextInParagraph(paragraph: XWPFParagraph, replacements: Map<String, String>) {
-    var text = paragraph.paragraphText
-    var updated = false
+        var text = paragraph.paragraphText
+        var updated = false
 
-    replacements.forEach { (key, value) ->
-        if (text.contains(key)) {
-            text = text.replace(key, value)
-            updated = true
-        }
-    }
-
-    if (updated) {
-        // 1. Считываем и сохраняем форматирование из оригинального элемента Word
-        val firstRun = paragraph.runs.firstOrNull()
-        val fontFamily = firstRun?.fontFamily
-        val fontSize = firstRun?.fontSizeAsDouble
-        val isBold = firstRun?.isBold ?: false
-        val isItalic = firstRun?.isItalic ?: false
-        val underline = firstRun?.underline
-
-        // 2. Очищаем старый текст
-        for (i in paragraph.runs.size - 1 downTo 0) {
-            paragraph.removeRun(i)
+        replacements.forEach { (key, value) ->
+            if (text.contains(key)) {
+                text = text.replace(key, value)
+                updated = true
+            }
         }
 
-        // 3. Создаем новый элемент и точно воспроизводим шрифт и стили оригинала
-        val newRun = paragraph.createRun()
-        if (fontFamily != null) newRun.fontFamily = fontFamily
-        if (fontSize != null && fontSize > 0) newRun.fontSize = fontSize
-        newRun.isBold = isBold
-        newRun.isItalic = isItalic
-        if (underline != null) newRun.underline = underline
+        if (updated) {
+            // 1. Считываем и сохраняем форматирование из оригинального элемента Word
+            val firstRun = paragraph.runs.firstOrNull()
+            val fontFamily = firstRun?.fontFamily
+            val fontSize = firstRun?.fontSize // Используем Int для корректного совпадения типов
+            val isBold = firstRun?.isBold ?: false
+            val isItalic = firstRun?.isItalic ?: false
+            val underline = firstRun?.underline
 
-        newRun.setText(text)
+            // 2. Очищаем старый текст
+            for (i in paragraph.runs.size - 1 downTo 0) {
+                paragraph.removeRun(i)
+            }
+
+            // 3. Создаем новый элемент и точно воспроизводим шрифт и стили оригинала
+            val newRun = paragraph.createRun()
+            if (fontFamily != null) newRun.fontFamily = fontFamily
+            if (fontSize != null && fontSize > 0) newRun.fontSize = fontSize
+            newRun.isBold = isBold
+            newRun.isItalic = isItalic
+            if (underline != null) newRun.underline = underline
+
+            newRun.setText(text)
+        }
     }
-}
-
 
     private fun fillExpenseTable(doc: XWPFDocument, data: ReportData) {
         val expenseTable = doc.tables.find { table ->
@@ -141,7 +139,7 @@ object DocxGenerator {
 
         val startDataRowIndex = if (numberingRowIndex != -1) numberingRowIndex + 1 else 3
 
-        // Эталонная высота строки (берётся из первой строки данных шаблона или задается в ~380 twips)
+        // Эталонная высота строки
         val sampleRow = expenseTable.rows.getOrNull(startDataRowIndex)
         val sampleHeight = if (sampleRow != null && sampleRow.height > 0) sampleRow.height else 380
 
@@ -230,7 +228,7 @@ object DocxGenerator {
     ) {
         if (cell == null) return
 
-        // Выравнивание по вертикали (строго по центру ячейки)
+        // Выравнивание по вертикали
         cell.verticalAlignment = XWPFTableCell.XWPFVertAlign.CENTER
 
         val p = if (cell.paragraphs.isNotEmpty()) cell.paragraphs[0] else cell.addParagraph()
@@ -239,7 +237,6 @@ object DocxGenerator {
             p.removeRun(i)
         }
 
-        // Выравнивание по горизонтали и обнуление лишних отступов
         p.alignment = alignment
         p.spacingBefore = 0
         p.spacingAfter = 0
