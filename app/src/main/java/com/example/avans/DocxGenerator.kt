@@ -1,6 +1,7 @@
 package com.example.avans
 
 import android.content.Context
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xwpf.usermodel.XWPFTable
@@ -113,14 +114,17 @@ object DocxGenerator {
             }
         } ?: return
 
-        // Поиск строки нумерации (содержит 6, 7, 8, 9)
+        // Поиск строки нумерации (1 2 3 4 5 6 7 8 9)
         val numberingRowIndex = expenseTable.rows.indexOfFirst { row ->
             val texts = row.tableCells.map { it.text.trim() }
             texts.contains("6") && texts.contains("7") && texts.contains("8") && texts.contains("9")
         }
 
-        // Данные начинаются строго ПОСЛЕ строки нумерации
         val startDataRowIndex = if (numberingRowIndex != -1) numberingRowIndex + 1 else 3
+
+        // Эталонная высота строки (берётся из первой строки данных шаблона или задается в ~380 twips)
+        val sampleRow = expenseTable.rows.getOrNull(startDataRowIndex)
+        val sampleHeight = if (sampleRow != null && sampleRow.height > 0) sampleRow.height else 380
 
         val allItems = mutableListOf<ExpenseItem>()
         allItems.add(
@@ -133,7 +137,7 @@ object DocxGenerator {
         )
         allItems.addAll(data.expenses)
 
-        // Гарантируем минимум 5 строк в таблице
+        // Гарантируем минимум 5 строк
         val minRows = 5
         val totalRowsToDisplay = maxOf(minRows, allItems.size)
 
@@ -142,7 +146,6 @@ object DocxGenerator {
         for (i in 0 until totalRowsToDisplay) {
             val targetRowIndex = startDataRowIndex + i
 
-            // Проверяем, не уперлись ли в строку "Итого"
             val currentRow = expenseTable.rows.getOrNull(targetRowIndex)
             val isTotalRow = currentRow?.tableCells?.any { it.text.contains("Итого", ignoreCase = true) } == true
 
@@ -152,6 +155,9 @@ object DocxGenerator {
                 expenseTable.getRow(targetRowIndex)
             }
 
+            // Устанавливаем единую высоту строки
+            row.height = sampleHeight
+
             while (row.tableCells.size < 9) {
                 row.addNewTableCell()
             }
@@ -159,56 +165,69 @@ object DocxGenerator {
             if (i < allItems.size) {
                 val item = allItems[i]
                 totalSum += item.sum
-                setCellText(row.getCell(0), "${i + 1}")
-                setCellText(row.getCell(1), item.date)
-                setCellText(row.getCell(2), item.docNumber)
-                setCellText(row.getCell(3), item.name)
-                setCellText(row.getCell(4), String.format("%.2f", item.sum))
+                setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
+                setCellText(row.getCell(1), item.date, ParagraphAlignment.CENTER)
+                setCellText(row.getCell(2), item.docNumber, ParagraphAlignment.CENTER)
+                setCellText(row.getCell(3), item.name, ParagraphAlignment.LEFT)
+                setCellText(row.getCell(4), String.format("%.2f", item.sum), ParagraphAlignment.RIGHT)
             } else {
-                // Заполнение пустых строк до 5 штук
-                setCellText(row.getCell(0), "${i + 1}")
-                setCellText(row.getCell(1), "")
-                setCellText(row.getCell(2), "")
-                setCellText(row.getCell(3), "")
-                setCellText(row.getCell(4), "")
+                // Пустые строки для выравнивания бланка
+                setCellText(row.getCell(0), "${i + 1}", ParagraphAlignment.CENTER)
+                setCellText(row.getCell(1), "", ParagraphAlignment.CENTER)
+                setCellText(row.getCell(2), "", ParagraphAlignment.CENTER)
+                setCellText(row.getCell(3), "", ParagraphAlignment.LEFT)
+                setCellText(row.getCell(4), "", ParagraphAlignment.RIGHT)
             }
 
-            // Очистка колонок валюты/дебета (5..8)
+            // Очистка и центрирование неиспользуемых колонок валюты/дебета (5..8)
             for (c in 5..8) {
-                setCellText(row.getCell(c), "")
+                setCellText(row.getCell(c), "", ParagraphAlignment.CENTER)
             }
         }
 
-        // Выравнивание суммы "Итого"
+        // Заполнение строки "Итого"
         val totalRowIndex = expenseTable.rows.indexOfFirst { row ->
             row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
         }
 
         if (totalRowIndex != -1) {
             val totalRow = expenseTable.getRow(totalRowIndex)
+            totalRow.height = sampleHeight
             val sumStr = String.format("%.2f", totalSum)
 
             if (totalRow.tableCells.size < 9) {
-                // Для объединенной строки "Итого": getCell(1) — это графа "в руб. коп."
-                setCellText(totalRow.getCell(1), sumStr)
+                setCellText(totalRow.getCell(1), sumStr, ParagraphAlignment.RIGHT, isBold = true)
             } else {
-                setCellText(totalRow.getCell(4), sumStr)
+                setCellText(totalRow.getCell(4), sumStr, ParagraphAlignment.RIGHT, isBold = true)
             }
         }
     }
 
-    private fun setCellText(cell: XWPFTableCell?, text: String) {
+    private fun setCellText(
+        cell: XWPFTableCell?,
+        text: String,
+        alignment: ParagraphAlignment = ParagraphAlignment.CENTER,
+        isBold: Boolean = false
+    ) {
         if (cell == null) return
-        if (cell.paragraphs.isNotEmpty()) {
-            val p = cell.paragraphs[0]
-            for (i in p.runs.size - 1 downTo 0) {
-                p.removeRun(i)
-            }
-            val run = p.createRun()
-            run.fontSize = 8
-            run.setText(text)
-        } else {
-            cell.setText(text)
+
+        // Выравнивание по вертикали (строго по центру ячейки)
+        cell.verticalAlignment = XWPFTableCell.XWPFVertAlign.CENTER
+
+        val p = if (cell.paragraphs.isNotEmpty()) cell.paragraphs[0] else cell.addParagraph()
+
+        for (i in p.runs.size - 1 downTo 0) {
+            p.removeRun(i)
         }
+
+        // Выравнивание по горизонтали и обнуление лишних отступов
+        p.alignment = alignment
+        p.spacingBefore = 0
+        p.spacingAfter = 0
+
+        val run = p.createRun()
+        run.fontSize = 8
+        run.isBold = isBold
+        run.setText(text)
     }
 }
