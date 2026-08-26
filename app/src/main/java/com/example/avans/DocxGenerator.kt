@@ -85,24 +85,43 @@ object DocxGenerator {
     }
 
     private fun replaceTextInParagraph(paragraph: XWPFParagraph, replacements: Map<String, String>) {
-        var text = paragraph.paragraphText
-        var updated = false
+    private fun replaceTextInParagraph(paragraph: XWPFParagraph, replacements: Map<String, String>) {
+    var text = paragraph.paragraphText
+    var updated = false
 
-        replacements.forEach { (key, value) ->
-            if (text.contains(key)) {
-                text = text.replace(key, value)
-                updated = true
-            }
-        }
-
-        if (updated) {
-            for (i in paragraph.runs.size - 1 downTo 0) {
-                paragraph.removeRun(i)
-            }
-            val newRun = paragraph.createRun()
-            newRun.setText(text)
+    replacements.forEach { (key, value) ->
+        if (text.contains(key)) {
+            text = text.replace(key, value)
+            updated = true
         }
     }
+
+    if (updated) {
+        // 1. Считываем и сохраняем форматирование из оригинального элемента Word
+        val firstRun = paragraph.runs.firstOrNull()
+        val fontFamily = firstRun?.fontFamily
+        val fontSize = firstRun?.fontSizeAsDouble
+        val isBold = firstRun?.isBold ?: false
+        val isItalic = firstRun?.isItalic ?: false
+        val underline = firstRun?.underline
+
+        // 2. Очищаем старый текст
+        for (i in paragraph.runs.size - 1 downTo 0) {
+            paragraph.removeRun(i)
+        }
+
+        // 3. Создаем новый элемент и точно воспроизводим шрифт и стили оригинала
+        val newRun = paragraph.createRun()
+        if (fontFamily != null) newRun.fontFamily = fontFamily
+        if (fontSize != null && fontSize > 0) newRun.fontSize = fontSize
+        newRun.isBold = isBold
+        newRun.isItalic = isItalic
+        if (underline != null) newRun.underline = underline
+
+        newRun.setText(text)
+    }
+}
+
 
     private fun fillExpenseTable(doc: XWPFDocument, data: ReportData) {
         val expenseTable = doc.tables.find { table ->
