@@ -326,7 +326,7 @@ fun AvansReportScreen(
                         .fillMaxWidth()
                         .height(50.dp)
                 ) {
-                    Text("Сформировать и открыть PDF")
+                    Text("Сформировать и открыть .docx")
                 }
             }
         }
@@ -707,14 +707,12 @@ fun calculateDays(startDateStr: String, endDateStr: String): Long {
 
 private fun generateAndOpenReport(context: Context, data: ReportData) {
     try {
-        // Очищаем назначение аванса от запрещенных символов файловой системы
         val safePurpose = data.purpose
             .replace(Regex("[\\\\/:*?\"<>|]"), "_")
             .trim()
             .ifEmpty { "Авансовый_отчет" }
 
-        // Имя файла строится динамически из назначения аванса
-        val fileName = "$safePurpose.pdf"
+        val fileName = "$safePurpose.docx"
         val outFile = File(context.cacheDir, fileName)
         
         DocxGenerator.generateReport(context, data, outFile)
@@ -725,7 +723,7 @@ private fun generateAndOpenReport(context: Context, data: ReportData) {
             outFile
         )
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
+            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
