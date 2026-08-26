@@ -4,6 +4,7 @@ import android.content.Context
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xwpf.usermodel.XWPFTable
+import org.apache.poi.xwpf.usermodel.XWPFTableCell
 import java.io.File
 import java.io.FileOutputStream
 
@@ -42,7 +43,6 @@ object DocxGenerator {
 
         val doc = XWPFDocument(inputStream)
 
-        // Словарь замен с поддержкой верхнего и нижнего регистра меток
         val replacements = mapOf(
             "{{REPORT_DATE}}" to data.reportDate,
             "{{report_date}}" to data.reportDate,
@@ -58,13 +58,13 @@ object DocxGenerator {
             "{{purpose}}" to data.purpose
         )
 
-        // 1. Замена меток в абзацах
+        // 1. Замена меток в обычных параграфах
         doc.paragraphs.forEach { replaceTextInParagraph(it, replacements) }
 
-        // 2. Замена меток во всех таблицах
+        // 2. Замена меток во всех таблицах (шапка, ФИО, подписи)
         doc.tables.forEach { replaceInTable(it, replacements) }
 
-        // 3. Заполнение таблицы расходов
+        // 3. Заполнение таблицы чеков строго на оборотной стороне (стр. 2)
         fillExpenseTable(doc, data)
 
         FileOutputStream(outputFile).use { out ->
@@ -104,32 +104,77 @@ object DocxGenerator {
     }
 
     private fun fillExpenseTable(doc: XWPFDocument, data: ReportData) {
-        val table = doc.tables.getOrNull(0) ?: return
+        // Ищем именно таблицу оборотной стороны (содержит заголовок "Наименование" или "Сумма расхода")
+        val expenseTable = doc.tables.find { table ->
+            table.rows.any { row ->
+                row.tableCells.any { cell ->
+                    cell.text.contains("Наименование документа", ignoreCase = true) ||
+                    cell.text.contains("Сумма расхода", ignoreCase = true)
+                }
+            }
+        } ?: return
 
-        // Заполнение первой строки (суточные)
-        if (table.rows.size > 1) {
-            val row1 = table.getRow(1)
-            row1.getCell(0)?.setText("1")
-            row1.getCell(1)?.setText("${data.startDate} - ${data.endDate}")
-            row1.getCell(2)?.setText("-")
-            row1.getCell(3)?.setText("Суточные")
-            row1.getCell(4)?.setText(String.format("%.2f", data.perDiemSum))
-        }
+        val allItems = mutableListOf<ExpenseItem>()
+        // 1-я строка: Суточные
+        allItems.add(
+            ExpenseItem(
+                date = "${data.startDate} - ${data.endDate}",
+                docNumber = "-",
+                name = "Суточные",
+                sum = data.perDiemSum
+            )
+        )
+        // Остальные строки: чеки и билеты
+        allItems.addAll(data.expenses)
 
-        // Заполнение чеков
-        var totalSum = data.perDiemSum
-        data.expenses.forEachIndexed { index, item ->
-            val row = table.createRow()
-            row.getCell(0)?.setText("${index + 2}")
-            row.getCell(1)?.setText(item.date)
-            row.getCell(2)?.setText(item.docNumber)
-            row.getCell(3)?.setText(item.name)
-            row.getCell(4)?.setText(String.format("%.2f", item.sum))
+        // Индекс строк с данными начинается после шапки таблицы (обычно со строки №3)
+        var currentRowIndex = 3
+        var totalSum = 0.0
+
+        allItems.forEachIndexed { index, item ->
             totalSum += item.sum
+
+            val row = if (currentRowIndex < expenseTable.rows.size) {
+                val existingRow = expenseTable.getRow(currentRowIndex)
+                if (existingRow.tableCells.any { it.text.contains("Итого", ignoreCase = true) }) {
+                    expenseTable.insertNewTableRow(currentRowIndex)
+                } else {
+                    existingRow
+                }
+            } else {
+                expenseTable.createRow()
+            }
+
+            setCellText(row.getCell(0), "${index + 1}")
+            setCellText(row.getCell(1), item.date)
+            setCellText(row.getCell(2), item.docNumber)
+            setCellText(row.getCell(3), item.name)
+            setCellText(row.getCell(4), String.format("%.2f", item.sum))
+
+            currentRowIndex++
         }
 
-        val totalRow = table.createRow()
-        totalRow.getCell(3)?.setText("Итого израсходовано:")
-        totalRow.getCell(4)?.setText(String.format("%.2f", totalSum))
+        // Заполняем итоговую сумму в строке "Итого"
+        val totalRow = expenseTable.rows.find { row ->
+            row.tableCells.any { it.text.contains("Итого", ignoreCase = true) }
+        }
+        if (totalRow != null) {
+            setCellText(totalRow.getCell(4), String.format("%.2f", totalSum))
+        }
+    }
+
+    private fun setCellText(cell: XWPFTableCell?, text: String) {
+        if (cell == null) return
+        if (cell.paragraphs.isNotEmpty()) {
+            val p = cell.paragraphs[0]
+            for (i in p.runs.size - 1 downTo 0) {
+                p.removeRun(i)
+            }
+            val run = p.createRun()
+            run.fontSize = 8
+            run.setText(text)
+        } else {
+            cell.setText(text)
+        }
     }
 }
