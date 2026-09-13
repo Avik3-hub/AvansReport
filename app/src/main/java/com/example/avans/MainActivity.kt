@@ -42,6 +42,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -214,18 +217,72 @@ fun FlightDetailsBlock() {
         }
 
         item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { generateAndOpenMemo(context, legs) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            ) {
-                Text("Сформировать и открыть .xlsx")
-            }
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // ТЕКУЩАЯ КНОПКА (Word / Excel) - код клика перенесен без изменений
+        Button(
+            onClick = {
+                val parsedPerDiem = perDiemSum.toDoubleOrNull() ?: 0.0
+                val parsedExpenses = expensesList.map {
+                    ExpenseItem(
+                        date = it.date,
+                        docNumber = it.docNumber,
+                        name = it.name,
+                        sum = it.sum.toDoubleOrNull() ?: 0.0
+                    )
+                }
+                val data = ReportData(
+                    reportDate = reportDate,
+                    purpose = purpose,
+                    startDate = startDate,
+                    endDate = endDate,
+                    perDiemSum = parsedPerDiem,
+                    expenses = parsedExpenses
+                )
+                onGenerateReport(data) // Запуск текущей рабочей генерации
+            },
+            modifier = Modifier
+                .weight(1f)
+                .height(50.dp)
+        ) {
+            Text("Открыть .docx", fontSize = 12.sp)
+        }
+
+        // НОВАЯ КНОПКА ДЛЯ PDF
+        Button(
+            onClick = {
+                val parsedPerDiem = perDiemSum.toDoubleOrNull() ?: 0.0
+                val parsedExpenses = expensesList.map {
+                    ExpenseItem(
+                        date = it.date,
+                        docNumber = it.docNumber,
+                        name = it.name,
+                        sum = it.sum.toDoubleOrNull() ?: 0.0
+                    )
+                }
+                val data = ReportData(
+                    reportDate = reportDate,
+                    purpose = purpose,
+                    startDate = startDate,
+                    endDate = endDate,
+                    perDiemSum = parsedPerDiem,
+                    expenses = parsedExpenses
+                )
+                generateAndOpenPdf(data) // Запуск генерации PDF
+            },
+            modifier = Modifier
+                .weight(1f)
+                .height(50.dp)
+        ) {
+            Text("Открыть .pdf", fontSize = 12.sp)
         }
     }
 }
+
 
 @Composable
 fun FlightLegCard(
@@ -499,40 +556,79 @@ fun AvansReportScreen(
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        val fullPurpose = "Командировка в $destinationCity".trim()
-                        
-                        destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
-                        expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
-                            expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
-                        }
-                        val data = ReportData(
-                            reportDate = reportDate,
-                            purpose = fullPurpose,
-                            startDate = startDate,
-                            endDate = endDate,
-                            perDiemSum = perDiemSum,
-                            expenses = expenses,
-                            employee = EmployeeInfo(
-                                name = employeeName.toShortName(),
-                                tabNumber = tabNumber,
-                                position = position,
-                                department = department
-                            )
-                        )
-                        generateAndOpenReport(context, data)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                ) {
-                    Text("Сформировать и открыть .docx")
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    // Вот сюда добавляется Row, который делит место между двумя кнопками:
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // --- 1. КНОПКА ДЛЯ DOCX (Ваша существующая логика) ---
+        Button(
+            onClick = {
+                val fullPurpose = "Командировка в $destinationCity".trim()
+                
+                destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
+                expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
+                    expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
                 }
-            }
+                val data = ReportData(
+                    reportDate = reportDate,
+                    purpose = fullPurpose,
+                    startDate = startDate,
+                    endDate = endDate,
+                    perDiemSum = perDiemSum,
+                    expenses = expenses,
+                    employee = EmployeeInfo(
+                        name = employeeName.toShortName(),
+                        tabNumber = tabNumber,
+                        position = position,
+                        department = department
+                    )
+                )
+                generateAndOpenReport(context, data)
+            },
+            modifier = Modifier
+                .weight(1f) // Занимает ровно 50% ширины
+                .height(50.dp)
+        ) {
+            Text("Открыть .docx", fontSize = 12.sp)
+        }
+
+        // --- 2. КНОПКА ДЛЯ PDF (Новая кнопка) ---
+        Button(
+            onClick = {
+                val fullPurpose = "Командировка в $destinationCity".trim()
+                
+                destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
+                expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
+                    expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
+                }
+                val data = ReportData(
+                    reportDate = reportDate,
+                    purpose = fullPurpose,
+                    startDate = startDate,
+                    endDate = endDate,
+                    perDiemSum = perDiemSum,
+                    expenses = expenses,
+                    employee = EmployeeInfo(
+                        name = employeeName.toShortName(),
+                        tabNumber = tabNumber,
+                        position = position,
+                        department = department
+                    )
+                )
+                generateAndOpenReportPdf(context, data)
+            },
+            modifier = Modifier
+                .weight(1f) // Занимает ровно 50% ширины
+                .height(50.dp)
+        ) {
+            Text("Открыть .pdf", fontSize = 12.sp)
         }
     }
+}
+
     if (showEmployeeDialog) {
         EmployeeDialog(
             currentName = employeeName,
@@ -1047,5 +1143,90 @@ private fun generateAndOpenMemo(context: Context, legsInput: List<FlightLegInput
         e.printStackTrace()
         val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
         Toast.makeText(context, "Ошибка: $errorDetails", Toast.LENGTH_LONG).show()
+    }
+}
+// --- 1. Генерация PDF для Авансового отчета ---
+private fun generateAndOpenReportPdf(context: Context, data: ReportData) {
+    try {
+        val safePurpose = data.purpose
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .trim()
+            .ifEmpty { "Авансовый_отчет" }
+        val fileName = "$safePurpose.pdf"
+        val outFile = File(context.cacheDir, fileName)
+
+        // Вызываем генератор PDF отчета
+        PdfNativeGenerator.generateFlightPdf(context, data, outFile)
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            outFile
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать PDF отчет"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
+        Toast.makeText(context, "Ошибка PDF: $errorDetails", Toast.LENGTH_LONG).show()
+    }
+}
+
+// --- 2. Генерация PDF для Служебной записки (Перелетов) ---
+private fun generateAndOpenMemoPdf(context: Context, legsInput: List<FlightLegInput>) {
+    try {
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val fullName = prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович"
+        val tabNumber = prefs.getString("emp_tab_number", "8701") ?: "8701"
+        val position = prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО"
+        val department = prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов"
+
+        val memoLegs = legsInput.map { leg ->
+            val (depD, depM, depY) = parseDateToComponents(leg.depDate)
+            val (arrD, arrM, arrY) = parseDateToComponents(leg.arrDate)
+            FlightLeg(
+                from = leg.from,
+                to = leg.to,
+                depDay = depD,
+                depMonth = depM,
+                depYear = depY,
+                arrDay = arrD,
+                arrMonth = arrM,
+                arrYear = arrY,
+                taskNumber = leg.taskNumber
+            )
+        }
+
+        val memoData = MemoData(
+            employeeName = fullName,
+            position = position,
+            department = department,
+            tabNum = tabNumber,
+            legs = memoLegs
+        )
+
+        val fileName = "Убытие_прибытие.pdf"
+        val outFile = File(context.cacheDir, fileName)
+
+        // Вызываем генератор PDF служебной записки
+        PdfFlightListGenerator.generatePdf(memoData, outFile)
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            outFile
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать PDF перелетов"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
+        Toast.makeText(context, "Ошибка PDF: $errorDetails", Toast.LENGTH_LONG).show()
     }
 }
