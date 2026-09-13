@@ -138,7 +138,7 @@ object PdfNativeGenerator {
         return String.format(Locale.US, "%.2f", amount)
     }
 
-    private fun getFontPath(context: Context): String {
+    internal fun getFontPath(context: Context): String {
         val fontFile = File(context.cacheDir, "arialmt.ttf")
         if (!fontFile.exists() || fontFile.length() == 0L) {
             context.assets.open("arialmt.ttf").use { input ->
@@ -152,13 +152,16 @@ object PdfNativeGenerator {
 }
 
 object PdfFlightListGenerator {
-    fun generatePdf(memoData: MemoData, outputFile: File) {
+    fun generatePdf(context: Context, memoData: MemoData, outputFile: File) {
         val document = Document(PageSize.A4, 36f, 36f, 36f, 36f)
         PdfWriter.getInstance(document, FileOutputStream(outputFile))
         document.open()
 
-        val fontTitle = Font(null, 12f, Font.BOLD)
-        val fontRegular = Font(null, 9f, Font.NORMAL)
+        val fontPath = PdfNativeGenerator.getFontPath(context)
+        val baseFont = BaseFont.createFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED)
+
+        val fontTitle = Font(baseFont, 12f, Font.BOLD)
+        val fontRegular = Font(baseFont, 9f, Font.NORMAL)
 
         document.add(Paragraph("Сведения о перелетах", fontTitle))
         document.add(Paragraph("Сотрудник: ${memoData.employeeName} (${memoData.position})", fontRegular))
