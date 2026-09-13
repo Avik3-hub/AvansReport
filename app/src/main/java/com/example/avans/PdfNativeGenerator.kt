@@ -12,13 +12,11 @@ import java.io.FileOutputStream
 object PdfNativeGenerator {
 
     fun generateFlightPdf(context: Context, data: ReportData, outputFile: File) {
-        // Устанавливаем альбомную или портретную ориентацию A4 со стандартными полями
         val document = Document(PageSize.A4, 36f, 36f, 36f, 36f)
         PdfWriter.getInstance(document, FileOutputStream(outputFile))
         document.open()
 
-        // Подключаем шрифт из assets для кириллицы (стандартный Times/Arial look)
-        val fontPath = "assets/arialmt.ttf"
+        val fontPath = "assets/arial.ttf"
         val baseFont = BaseFont.createFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED)
         
         val fontTitle = Font(baseFont, 12f, Font.BOLD)
@@ -26,12 +24,12 @@ object PdfNativeGenerator {
         val fontRegular = Font(baseFont, 9f, Font.NORMAL)
         val fontSmall = Font(baseFont, 7f, Font.NORMAL)
 
-        // 1. Шапка документа (Строго как в форме АО-1)
+        // 1. Шапка документа (Строго по АО-1)
         val orgHeader = Paragraph("Ухтинский филиал ООО Авиапредприятие «Газпром авиа»", fontRegular)
         document.add(orgHeader)
         
         val docTitle = Paragraph("АВАНСОВЫЙ ОТЧЕТ № _____ от ${data.reportDate}", fontTitle)
-        docTitle.alignment = Element.ALIGN_CENTER
+        docTitle.setAlignment(Element.ALIGN_CENTER)
         document.add(docTitle)
         document.add(Paragraph(" ", fontSmall))
 
@@ -42,11 +40,10 @@ object PdfNativeGenerator {
         document.add(Paragraph("Назначение аванса: ${data.purpose}", fontRegular))
         document.add(Paragraph(" ", fontSmall))
 
-        // 2. Таблица расходов (Оборотная сторона формы № АО-1: 5 основных колонок)[span_3](start_span)[span_3](end_span)
+        // 2. Таблица расходов
         val table = PdfPTable(floatArrayOf(1f, 3f, 3f, 8f, 3f))
         table.widthPercentage = 100f
 
-        // Заголовки колонок (Строгий стиль, без заливки цвета)[span_4](start_span)[span_4](end_span)
         val headers = arrayOf(
             "№\nпп", 
             "Дата документа", 
@@ -57,15 +54,15 @@ object PdfNativeGenerator {
 
         for (headerText in headers) {
             val cell = PdfPCell(Phrase(headerText, fontBold)).apply {
-                horizontalAlignment = Element.ALIGN_CENTER
-                verticalAlignment = Element.ALIGN_MIDDLE
-                padding = 4f
-                borderWidth = 0.5f // Тонкая стандартная рамка таблицы
+                setHorizontalAlignment(Element.ALIGN_CENTER)
+                setVerticalAlignment(Element.ALIGN_MIDDLE)
+                setPadding(4f)
+                setBorderWidth(0.5f)
             }
             table.addCell(cell)
         }
 
-        // --- 1-я строка: Суточные (Две даты в графе "Дата")[span_5](start_span)[span_5](end_span) ---
+        // --- 1-я строка: Суточные ---
         table.addCell(createCell("1", fontRegular, Element.ALIGN_CENTER))
         table.addCell(createCell("${data.startDate}\n${data.endDate}", fontRegular, Element.ALIGN_CENTER))
         table.addCell(createCell("-", fontRegular, Element.ALIGN_CENTER))
@@ -74,7 +71,7 @@ object PdfNativeGenerator {
 
         var totalSum = data.perDiemSum
 
-        // --- Остальные чеки и билеты[span_6](start_span)[span_6](end_span) ---
+        // --- Чеки и билеты ---
         data.expenses.forEachIndexed { index, expense ->
             val rowNum = (index + 2).toString()
             table.addCell(createCell(rowNum, fontRegular, Element.ALIGN_CENTER))
@@ -85,7 +82,7 @@ object PdfNativeGenerator {
             totalSum += expense.sum
         }
 
-        // --- Добор пустых строк до минимума (чтобы бланк смотрелся полноразмерным) ---
+        // --- Пустые строки до минимума (5) ---
         val currentRows = data.expenses.size + 1
         if (currentRows < 5) {
             for (i in (currentRows + 1)..5) {
@@ -97,12 +94,12 @@ object PdfNativeGenerator {
             }
         }
 
-        // --- Строка Итого[span_7](start_span)[span_7](end_span) ---
-        val cellTotalLabel = PdfPCell(Phrase("Итогоизрасходовано:", fontBold)).apply {
-            colspan = 4
-            horizontalAlignment = Element.ALIGN_RIGHT
-            padding = 4f
-            borderWidth = 0.5f
+        // --- Строка Итого ---
+        val cellTotalLabel = PdfPCell(Phrase("Итого израсходовано:", fontBold)).apply {
+            setColspan(4)
+            setHorizontalAlignment(Element.ALIGN_RIGHT)
+            setPadding(4f)
+            setBorderWidth(0.5f)
         }
         table.addCell(cellTotalLabel)
 
@@ -112,21 +109,20 @@ object PdfNativeGenerator {
         document.add(table)
         document.add(Paragraph(" ", fontRegular))
 
-        // 3. Подписи внизу бланка[span_8](start_span)[span_8](end_span)
+        // 3. Подписи
         val signParagraph = Paragraph("Подотчетное лицо: ____________________ / ${data.employee.name} /", fontRegular)
-        signParagraph.alignment = Element.ALIGN_RIGHT
+        signParagraph.setAlignment(Element.ALIGN_RIGHT)
         document.add(signParagraph)
 
         document.close()
     }
 
-    // Вспомогательная функция для создания ячеек без цветного фона
     private fun createCell(text: String, font: Font, align: Int): PdfPCell {
         return PdfPCell(Phrase(text, font)).apply {
-            horizontalAlignment = align
-            verticalAlignment = Element.ALIGN_MIDDLE
-            padding = 4f
-            borderWidth = 0.5f // Обычные тонкие черные границы
+            setHorizontalAlignment(align)
+            setVerticalAlignment(Element.ALIGN_MIDDLE)
+            setPadding(4f)
+            setBorderWidth(0.5f)
         }
     }
 }
