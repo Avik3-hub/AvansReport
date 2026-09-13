@@ -120,7 +120,7 @@ fun MainAppPager(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val pages = listOf("Перелеты (1/2)", "Авансовый отчет (2/2)")
+            val pages = listOf("Перелеты", "Авансовый отчет")
             pages.forEachIndexed { index, title ->
                 val isSelected = pagerState.currentPage == index
                 Box(
@@ -211,31 +211,16 @@ fun FlightDetailsBlock() {
                 }
             )
         }
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { generateAndOpenMemo(context, legs) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                ) {
-                    Text("Открыть .xlsx", fontSize = 12.sp)
-                }
-                Button(
-                    onClick = { generateAndOpenMemoPdf(context, legs) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                ) {
-                    Text("Открыть .pdf", fontSize = 12.sp)
-                }
-            }
-        }
+        Item {
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    Button(
+        onClick = { generateAndOpenMemo(context, legs) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+    ) {
+        Text("Открыть .xlsx", fontSize = 12.sp)
     }
 }
 
@@ -515,74 +500,39 @@ fun AvansReportScreen(
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            val fullPurpose = "Командировка в $destinationCity".trim()
-                            destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
-                            expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
-                                expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
-                            }
-                            val data = ReportData(
-                                reportDate = reportDate,
-                                purpose = fullPurpose,
-                                startDate = startDate,
-                                endDate = endDate,
-                                perDiemSum = perDiemSum,
-                                expenses = expenses,
-                                employee = EmployeeInfo(
-                                    name = employeeName.toShortName(),
-                                    tabNumber = tabNumber,
-                                    position = position,
-                                    department = department
-                                )
-                            )
-                            generateAndOpenReport(context, data)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                    ) {
-                        Text("Открыть .docx", fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = {
-                            val fullPurpose = "Командировка в $destinationCity".trim()
-                            destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
-                            expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
-                                expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
-                            }
-                            val data = ReportData(
-                                reportDate = reportDate,
-                                purpose = fullPurpose,
-                                startDate = startDate,
-                                endDate = endDate,
-                                perDiemSum = perDiemSum,
-                                expenses = expenses,
-                                employee = EmployeeInfo(
-                                    name = employeeName.toShortName(),
-                                    tabNumber = tabNumber,
-                                    position = position,
-                                    department = department
-                                )
-                            )
-                            generateAndOpenReportPdf(context, data)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                    ) {
-                        Text("Открыть .pdf", fontSize = 12.sp)
-                    }
-                }
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    Button(
+        onClick = {
+            val fullPurpose = "Командировка в $destinationCity".trim()
+            destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
+            expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
+                expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
             }
-        }
+            val data = ReportData(
+                reportDate = reportDate,
+                purpose = fullPurpose,
+                startDate = startDate,
+                endDate = endDate,
+                perDiemSum = perDiemSum,
+                expenses = expenses,
+                employee = EmployeeInfo(
+                    name = employeeName.toShortName(),
+                    tabNumber = tabNumber,
+                    position = position,
+                    department = department
+                )
+            )
+            generateAndOpenReport(context, data)
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+    ) {
+        Text("Открыть .docx", fontSize = 12.sp)
     }
+}
+
     
     if (showEmployeeDialog) {
         EmployeeDialog(
