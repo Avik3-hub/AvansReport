@@ -72,4 +72,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     implementation("org.apache.poi:poi-ooxml:5.2.5")
+    
+    // iTextPDF
+    implementation("com.itextpdf:itextpdf:5.5.13.3")
 }
