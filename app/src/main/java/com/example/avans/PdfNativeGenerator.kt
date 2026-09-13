@@ -1,13 +1,19 @@
 package com.example.avans
 
 import android.content.Context
-import com.itextpdf.text.*
+import com.itextpdf.text.Document
+import com.itextpdf.text.Element
+import com.itextpdf.text.Font
+import com.itextpdf.text.PageSize
+import com.itextpdf.text.Paragraph
+import com.itextpdf.text.Phrase
 import com.itextpdf.text.pdf.BaseFont
 import com.itextpdf.text.pdf.PdfPCell
 import com.itextpdf.text.pdf.PdfPTable
 import com.itextpdf.text.pdf.PdfWriter
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 object PdfNativeGenerator {
 
@@ -16,20 +22,22 @@ object PdfNativeGenerator {
         PdfWriter.getInstance(document, FileOutputStream(outputFile))
         document.open()
 
-        val fontPath = "assets/arial.ttf"
+        // Безопасное получение пути к шрифту arialmt.ttf из assets
+        val fontPath = getFontPath(context)
         val baseFont = BaseFont.createFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED)
-        
+
         val fontTitle = Font(baseFont, 12f, Font.BOLD)
         val fontBold = Font(baseFont, 9f, Font.BOLD)
         val fontRegular = Font(baseFont, 9f, Font.NORMAL)
         val fontSmall = Font(baseFont, 7f, Font.NORMAL)
 
-        // 1. Шапка документа (Строго по АО-1)
+        // 1. Шапка документа
         val orgHeader = Paragraph("Ухтинский филиал ООО Авиапредприятие «Газпром авиа»", fontRegular)
         document.add(orgHeader)
-        
-        val docTitle = Paragraph("АВАНСОВЫЙ ОТЧЕТ № _____ от ${data.reportDate}", fontTitle)
-        docTitle.setAlignment(Element.ALIGN_CENTER)
+
+        val docTitle = Paragraph("АВАНСОВЫЙ ОТЧЕТ № _____ от ${data.reportDate}", fontTitle).apply {
+            alignment = Element.ALIGN_CENTER
+        }
         document.add(docTitle)
         document.add(Paragraph(" ", fontSmall))
 
@@ -41,33 +49,34 @@ object PdfNativeGenerator {
         document.add(Paragraph(" ", fontSmall))
 
         // 2. Таблица расходов
-        val table = PdfPTable(floatArrayOf(1f, 3f, 3f, 8f, 3f))
-        table.widthPercentage = 100f
+        val table = PdfPTable(floatArrayOf(1f, 2.5f, 2.5f, 8f, 3f)).apply {
+            widthPercentage = 100f
+        }
 
         val headers = arrayOf(
-            "№\nпп", 
-            "Дата документа", 
-            "Номер документа", 
-            "Наименование документа (расхода)", 
+            "№\nпп",
+            "Дата документа",
+            "Номер документа",
+            "Наименование документа (расхода)",
             "Сумма расхода\nпо отчету (руб.)"
         )
 
         for (headerText in headers) {
             val cell = PdfPCell(Phrase(headerText, fontBold)).apply {
-                setHorizontalAlignment(Element.ALIGN_CENTER)
-                setVerticalAlignment(Element.ALIGN_MIDDLE)
-                setPadding(4f)
-                setBorderWidth(0.5f)
+                horizontalAlignment = Element.ALIGN_CENTER
+                verticalAlignment = Element.ALIGN_MIDDLE
+                padding = 4f
             }
             table.addCell(cell)
         }
 
         // --- 1-я строка: Суточные ---
+        val datesText = if (data.startDate == data.endDate) data.startDate else "${data.startDate}\n${data.endDate}"
         table.addCell(createCell("1", fontRegular, Element.ALIGN_CENTER))
-        table.addCell(createCell("${data.startDate}\n${data.endDate}", fontRegular, Element.ALIGN_CENTER))
+        table.addCell(createCell(datesText, fontRegular, Element.ALIGN_CENTER))
         table.addCell(createCell("-", fontRegular, Element.ALIGN_CENTER))
         table.addCell(createCell("Суточные", fontRegular, Element.ALIGN_LEFT))
-        table.addCell(createCell(String.format("%.2f", data.perDiemSum), fontRegular, Element.ALIGN_RIGHT))
+        table.addCell(createCell(formatMoney(data.perDiemSum), fontRegular, Element.ALIGN_RIGHT))
 
         var totalSum = data.perDiemSum
 
@@ -78,14 +87,15 @@ object PdfNativeGenerator {
             table.addCell(createCell(expense.date, fontRegular, Element.ALIGN_CENTER))
             table.addCell(createCell(expense.docNumber, fontRegular, Element.ALIGN_CENTER))
             table.addCell(createCell(expense.name, fontRegular, Element.ALIGN_LEFT))
-            table.addCell(createCell(String.format("%.2f", expense.sum), fontRegular, Element.ALIGN_RIGHT))
+            table.addCell(createCell(formatMoney(expense.sum), fontRegular, Element.ALIGN_RIGHT))
             totalSum += expense.sum
         }
 
-        // --- Пустые строки до минимума (5) ---
+        // --- Добор пустых строк до 6 ---
         val currentRows = data.expenses.size + 1
-        if (currentRows < 5) {
-            for (i in (currentRows + 1)..5) {
+        val minRows = 6
+        if (currentRows < minRows) {
+            for (i in (currentRows + 1)..minRows) {
                 table.addCell(createCell(i.toString(), fontRegular, Element.ALIGN_CENTER))
                 table.addCell(createCell("", fontRegular, Element.ALIGN_CENTER))
                 table.addCell(createCell("", fontRegular, Element.ALIGN_CENTER))
@@ -96,22 +106,22 @@ object PdfNativeGenerator {
 
         // --- Строка Итого ---
         val cellTotalLabel = PdfPCell(Phrase("Итого израсходовано:", fontBold)).apply {
-            setColspan(4)
-            setHorizontalAlignment(Element.ALIGN_RIGHT)
-            setPadding(4f)
-            setBorderWidth(0.5f)
+            colspan = 4
+            horizontalAlignment = Element.ALIGN_RIGHT
+            padding = 4f
         }
         table.addCell(cellTotalLabel)
 
-        val cellTotalVal = createCell(String.format("%.2f", totalSum), fontBold, Element.ALIGN_RIGHT)
+        val cellTotalVal = createCell(formatMoney(totalSum), fontBold, Element.ALIGN_RIGHT)
         table.addCell(cellTotalVal)
 
         document.add(table)
         document.add(Paragraph(" ", fontRegular))
 
-        // 3. Подписи
-        val signParagraph = Paragraph("Подотчетное лицо: ____________________ / ${data.employee.name} /", fontRegular)
-        signParagraph.setAlignment(Element.ALIGN_RIGHT)
+        // 3. Подпись
+        val signParagraph = Paragraph("Подотчетное лицо: ____________________ / ${data.employee.name} /", fontRegular).apply {
+            alignment = Element.ALIGN_RIGHT
+        }
         document.add(signParagraph)
 
         document.close()
@@ -119,10 +129,26 @@ object PdfNativeGenerator {
 
     private fun createCell(text: String, font: Font, align: Int): PdfPCell {
         return PdfPCell(Phrase(text, font)).apply {
-            setHorizontalAlignment(align)
-            setVerticalAlignment(Element.ALIGN_MIDDLE)
-            setPadding(4f)
-            setBorderWidth(0.5f)
+            horizontalAlignment = align
+            verticalAlignment = Element.ALIGN_MIDDLE
+            padding = 4f
         }
+    }
+
+    private fun formatMoney(amount: Double): String {
+        return String.format(Locale.US, "%.2f", amount)
+    }
+
+    // Копирование arialmt.ttf из assets во внутренний кэш
+    private fun getFontPath(context: Context): String {
+        val fontFile = File(context.cacheDir, "arialmt.ttf")
+        if (!fontFile.exists() || fontFile.length() == 0L) {
+            context.assets.open("arialmt.ttf").use { input ->
+                FileOutputStream(fontFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+        return fontFile.absolutePath
     }
 }
