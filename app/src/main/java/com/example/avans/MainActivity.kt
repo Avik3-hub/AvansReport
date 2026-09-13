@@ -1154,7 +1154,7 @@ private fun generateAndOpenMemoPdf(context: Context, legsInput: List<FlightLegIn
         )
         val fileName = "Убытие_прибытие.pdf"
         val outFile = File(context.cacheDir, fileName)
-        PdfFlightListGenerator.generatePdf(this, memoData, outFile)
+        PdfFlightListGenerator.generatePdf(this@MainActivity, memoData, outFile)
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
