@@ -223,6 +223,7 @@ fun FlightDetailsBlock() {
         Text("Открыть .xlsx", fontSize = 12.sp)
     }
 }
+    }
 
 @Composable
 fun FlightLegCard(
