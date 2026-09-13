@@ -22,7 +22,6 @@ object PdfNativeGenerator {
         PdfWriter.getInstance(document, FileOutputStream(outputFile))
         document.open()
 
-        // Безопасное получение пути к шрифту arialmt.ttf из assets
         val fontPath = getFontPath(context)
         val baseFont = BaseFont.createFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED)
 
@@ -65,7 +64,7 @@ object PdfNativeGenerator {
             val cell = PdfPCell(Phrase(headerText, fontBold)).apply {
                 horizontalAlignment = Element.ALIGN_CENTER
                 verticalAlignment = Element.ALIGN_MIDDLE
-                padding = 4f
+                setPadding(4f)
             }
             table.addCell(cell)
         }
@@ -108,7 +107,7 @@ object PdfNativeGenerator {
         val cellTotalLabel = PdfPCell(Phrase("Итого израсходовано:", fontBold)).apply {
             colspan = 4
             horizontalAlignment = Element.ALIGN_RIGHT
-            padding = 4f
+            setPadding(4f)
         }
         table.addCell(cellTotalLabel)
 
@@ -131,7 +130,7 @@ object PdfNativeGenerator {
         return PdfPCell(Phrase(text, font)).apply {
             horizontalAlignment = align
             verticalAlignment = Element.ALIGN_MIDDLE
-            padding = 4f
+            setPadding(4f)
         }
     }
 
@@ -139,7 +138,6 @@ object PdfNativeGenerator {
         return String.format(Locale.US, "%.2f", amount)
     }
 
-    // Копирование arialmt.ttf из assets во внутренний кэш
     private fun getFontPath(context: Context): String {
         val fontFile = File(context.cacheDir, "arialmt.ttf")
         if (!fontFile.exists() || fontFile.length() == 0L) {
@@ -150,5 +148,41 @@ object PdfNativeGenerator {
             }
         }
         return fontFile.absolutePath
+    }
+}
+
+object PdfFlightListGenerator {
+    fun generatePdf(memoData: MemoData, outputFile: File) {
+        val document = Document(PageSize.A4, 36f, 36f, 36f, 36f)
+        PdfWriter.getInstance(document, FileOutputStream(outputFile))
+        document.open()
+
+        val fontTitle = Font(null, 12f, Font.BOLD)
+        val fontRegular = Font(null, 9f, Font.NORMAL)
+
+        document.add(Paragraph("Сведения о перелетах", fontTitle))
+        document.add(Paragraph("Сотрудник: ${memoData.employeeName} (${memoData.position})", fontRegular))
+        document.add(Paragraph(" ", fontRegular))
+
+        val table = PdfPTable(floatArrayOf(1f, 3f, 3f, 3f, 3f, 2f)).apply {
+            widthPercentage = 100f
+        }
+
+        val headers = arrayOf("№", "Откуда", "Куда", "Убытие", "Прибытие", "№ п/з")
+        for (h in headers) {
+            table.addCell(PdfPCell(Phrase(h, fontRegular)).apply { setPadding(4f) })
+        }
+
+        memoData.legs.forEachIndexed { index, leg ->
+            table.addCell(PdfPCell(Phrase((index + 1).toString(), fontRegular)).apply { setPadding(4f) })
+            table.addCell(PdfPCell(Phrase(leg.from, fontRegular)).apply { setPadding(4f) })
+            table.addCell(PdfPCell(Phrase(leg.to, fontRegular)).apply { setPadding(4f) })
+            table.addCell(PdfPCell(Phrase("${leg.depDay} ${leg.depMonth} ${leg.depYear}", fontRegular)).apply { setPadding(4f) })
+            table.addCell(PdfPCell(Phrase("${leg.arrDay} ${leg.arrMonth} ${leg.arrYear}", fontRegular)).apply { setPadding(4f) })
+            table.addCell(PdfPCell(Phrase(leg.taskNumber, fontRegular)).apply { setPadding(4f) })
+        }
+
+        document.add(table)
+        document.close()
     }
 }
