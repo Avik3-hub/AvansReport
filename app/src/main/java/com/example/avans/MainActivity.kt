@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainAppPager(
@@ -141,6 +142,7 @@ fun MainAppPager(
         }
     }
 }
+
 data class FlightLegInput(
     val depDate: String = "",
     val arrDate: String = "",
@@ -148,6 +150,7 @@ data class FlightLegInput(
     val to: String = "",
     val taskNumber: String = ""
 )
+
 @Composable
 fun FlightDetailsBlock() {
     val context = LocalContext.current
@@ -207,20 +210,23 @@ fun FlightDetailsBlock() {
                 }
             )
         }
-        Item {
-    Spacer(modifier = Modifier.height(16.dp))
-    
-    Button(
-        onClick = { generateAndOpenMemo(context, legs) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        Text("Открыть .xlsx", fontSize = 12.sp)
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = {
+                    Toast.makeText(context, "Функция генерации таблицы отключена", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Text("Открыть .xlsx", fontSize = 12.sp)
+            }
+        }
     }
 }
-    }
-}
+
 @Composable
 fun FlightLegCard(
     index: Int,
@@ -256,218 +262,6 @@ fun FlightLegCard(
                     value = leg.arrDate,
                     onDateSelected = { onUpdate(leg.copy(arrDate = it)) },
                     modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = leg.from,
-                onValueChange = { onUpdate(leg.copy(from = it)) },
-                label = { Text("Откуда") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = leg.to,
-                onValueChange = { onUpdate(leg.copy(to = it)) },
-                label = { Text("Куда") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = leg.taskNumber,
-                onValueChange = { onUpdate(leg.copy(taskNumber = it)) },
-                label = { Text("№ Полетного задания") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-    }
-}
-enum class Region { SOUTH, NORTH }
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AvansReportScreen(
-    isDarkMode: Boolean,
-    onThemeToggle: () -> Unit
-) {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
-    var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
-    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович") }
-    var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
-    var position by remember { mutableStateOf(prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО") }
-    var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
-    var showSettingsDialog by remember { mutableStateOf(false) }
-    var showEmployeeDialog by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-    var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
-    var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
-    
-    var reportDate by remember {
-        mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
-    }
-    var destinationCity by remember {
-        mutableStateOf(prefs.getString("draft_destination_city", "Вологду") ?: "Вологду")
-    }
-    var startDate by remember {
-        mutableStateOf(prefs.getString("draft_start_date", "") ?: "")
-    }
-    var endDate by remember {
-        mutableStateOf(prefs.getString("draft_end_date", "") ?: "")
-    }
-    var selectedRegion by remember {
-        val regionStr = prefs.getString("draft_region", Region.SOUTH.name)
-        mutableStateOf(if (regionStr == Region.NORTH.name) Region.NORTH else Region.SOUTH)
-    }
-    var expenses by remember {
-        mutableStateOf(loadDraftExpenses(prefs))
-    }
-    
-    LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
-        saveDraft(prefs, reportDate, destinationCity, startDate, endDate, selectedRegion, expenses)
-    }
-    
-    val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
-    val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
-    val perDiemSum = daysCount * currentRate
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Авансовый отчет АО-1") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                actions = {
-                    IconButton(onClick = { showMenu = !showMenu }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Меню")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Данные сотрудника") },
-                            onClick = {
-                                showMenu = false
-                                showEmployeeDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Настройки суточных") },
-                            onClick = {
-                                showMenu = false
-                                showSettingsDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { 
-                                Text(if (isDarkMode) "Тема оформления: светлая" else "Тема оформления: темная") 
-                            },
-                            onClick = {
-                                showMenu = false
-                                onThemeToggle()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Сброс заполнения") },
-                            onClick = {
-                                showMenu = false
-                                reportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                destinationCity = ""
-                                startDate = ""
-                                endDate = ""
-                                selectedRegion = Region.SOUTH
-                                expenses = emptyList()
-                                Toast.makeText(context, "Черновик очищен", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Text("1. Основные данные", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                DatePickerField(
-                    label = "Дата составления отчета",
-                    value = reportDate,
-                    onDateSelected = { reportDate = it }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                AutoCompleteTextField(
-                    value = destinationCity,
-                    onValueChange = { destinationCity = it },
-                    label = "Место назначения",
-                    prefixText = "Командировка в ",
-                    history = destinationHistory
-                )
-            }
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("2. Суточные (1-я строка таблицы)", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Выбор региона:", style = MaterialTheme.typography.bodyMedium)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        ) {
-                            FilterChip(
-                                selected = selectedRegion == Region.SOUTH,
-                                onClick = { selectedRegion = Region.SOUTH },
-                                label = { Text("Юг (${southRate.toInt()} ₽/день)") }
-                            )
-                            FilterChip(
-                                selected = selectedRegion == Region.NORTH,
-                                onClick = { selectedRegion = Region.NORTH },
-                                label = { Text("Север (${northRate.toInt()} ₽/день)") }
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DatePickerField(
-                                label = "Дата начала",
-                                value = startDate,
-                                onDateSelected = { startDate = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                            DatePickerField(
-                                label = "Дата конца",
-                                value = endDate,
-                                onDateSelected = { endDate = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Дней: $daysCount | Сумма: ${String.format(Locale.US, "%.2f", perDiemSum)} ₽",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                .weight(1f)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -709,39 +503,21 @@ fun AvansReportScreen(
                 )
             }
             item {
-    Spacer(modifier = Modifier.height(16.dp))
-    
-    Button(
-        onClick = {
-            val fullPurpose = "Командировка в $destinationCity".trim()
-            destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
-            expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
-                expenseNameHistory = saveHistoryItem(prefs, "history_expense_names", name)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "Функция генерации отчета отключена", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Text("Открыть .docx", fontSize = 12.sp)
+                }
             }
-            val data = ReportData(
-                reportDate = reportDate,
-                purpose = fullPurpose,
-                startDate = startDate,
-                endDate = endDate,
-                perDiemSum = perDiemSum,
-                expenses = expenses,
-                employee = EmployeeInfo(
-                    name = employeeName.toShortName(),
-                    tabNumber = tabNumber,
-                    position = position,
-                    department = department
-                )
-            )
-            generateAndOpenReport(context, data)
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        Text("Открыть .docx", fontSize = 12.sp)
+        }
     }
-}
-
     
     if (showEmployeeDialog) {
         EmployeeDialog(
@@ -829,6 +605,51 @@ fun EmployeeDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(name, tabNumber, position, department) }) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
+}
+
+@Composable
+fun SettingsDialog(
+    currentSouth: Double,
+    currentNorth: Double,
+    onDismiss: () -> Unit,
+    onSave: (Double, Double) -> Unit
+) {
+    var south by remember { mutableStateOf(currentSouth.toString()) }
+    var north by remember { mutableStateOf(currentNorth.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Настройки суточных") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = south,
+                    onValueChange = { south = it },
+                    label = { Text("Суточные Юг (₽/день)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = north,
+                    onValueChange = { north = it },
+                    label = { Text("Суточные Север (₽/день)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val southVal = south.toDoubleOrNull() ?: currentSouth
+                val northVal = north.toDoubleOrNull() ?: currentNorth
+                onSave(southVal, northVal)
+            }) {
                 Text("Сохранить")
             }
         },
@@ -941,6 +762,13 @@ fun DatePickerField(
     }
 }
 
+data class ExpenseItem(
+    val date: String = "",
+    val docNumber: String = "",
+    val name: String = "",
+    val sum: Double = 0.0
+)
+
 @Composable
 fun ExpenseCard(
     index: Int,
@@ -998,108 +826,74 @@ fun ExpenseCard(
     }
 }
 
-@Composable
-fun SettingsDialog(
-    currentSouth: Double,
-    currentNorth: Double,
-    onDismiss: () -> Unit,
-    onSave: (Double, Double) -> Unit
-) {
-    var southInput by remember { mutableStateOf(currentSouth.toInt().toString()) }
-    var northInput by remember { mutableStateOf(currentNorth.toInt().toString()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Настройки ставок суточных") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = southInput,
-                    onValueChange = { southInput = it },
-                    label = { Text("Ставка Юг (руб/день)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                OutlinedTextField(
-                    value = northInput,
-                    onValueChange = { northInput = it },
-                    label = { Text("Ставка Север (руб/день)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val s = southInput.toDoubleOrNull() ?: currentSouth
-                val n = northInput.toDoubleOrNull() ?: currentNorth
-                onSave(s, n)
-            }) {
-                Text("Сохранить")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
-        }
-    )
-}
-
-fun String.toShortName(): String {
-    val parts = this.trim().split("\\s+".toRegex())
-    if (parts.isEmpty()) return ""
-    val lastName = parts[0]
-    val firstNameInitial = parts.getOrNull(1)?.firstOrNull()?.let { "$it." } ?: ""
-    val patronymicInitial = parts.getOrNull(2)?.firstOrNull()?.let { "$it." } ?: ""
-    return "$lastName $firstNameInitial$patronymicInitial".trim()
-}
-
-fun parseDateToComponents(dateStr: String): Triple<String, String, String> {
+// Placeholder functions - реализуйте их в отдельном файле Utils
+fun loadDraftLegs(prefs: android.content.SharedPreferences): List<FlightLegInput> {
+    val json = prefs.getString("draft_legs", "[]") ?: "[]"
     return try {
-        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-        val date = LocalDate.parse(dateStr, formatter)
-        val months = arrayOf(
-            "января", "февраля", "марта", "апреля", "мая", "июня",
-            "июля", "августа", "сентября", "октября", "ноября", "декабря"
-        )
-        Triple(
-            date.dayOfMonth.toString(),
-            months[date.monthValue - 1],
-            date.year.toString()
-        )
+        val arr = JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            FlightLegInput(
+                depDate = obj.optString("depDate", ""),
+                arrDate = obj.optString("arrDate", ""),
+                from = obj.optString("from", ""),
+                to = obj.optString("to", ""),
+                taskNumber = obj.optString("taskNumber", "")
+            )
+        }
     } catch (e: Exception) {
-        Triple("", "", "")
+        emptyList()
     }
 }
 
 fun saveDraftLegs(prefs: android.content.SharedPreferences, legs: List<FlightLegInput>) {
-    val jsonArray = JSONArray()
-    legs.forEach { item ->
-        val obj = JSONObject()
-        obj.put("depDate", item.depDate)
-        obj.put("arrDate", item.arrDate)
-        obj.put("from", item.from)
-        obj.put("to", item.to)
-        obj.put("taskNumber", item.taskNumber)
-        jsonArray.put(obj)
+    val arr = JSONArray()
+    legs.forEach { leg ->
+        arr.put(JSONObject().apply {
+            put("depDate", leg.depDate)
+            put("arrDate", leg.arrDate)
+            put("from", leg.from)
+            put("to", leg.to)
+            put("taskNumber", leg.taskNumber)
+        })
     }
-    prefs.edit().putString("draft_flight_legs", jsonArray.toString()).apply()
+    prefs.edit().putString("draft_legs", arr.toString()).apply()
 }
 
-fun loadDraftLegs(prefs: android.content.SharedPreferences): List<FlightLegInput> {
-    val jsonStr = prefs.getString("draft_flight_legs", null) ?: return emptyList()
+fun loadHistory(prefs: android.content.SharedPreferences, key: String): List<String> {
+    val json = prefs.getString(key, "[]") ?: "[]"
     return try {
-        val array = JSONArray(jsonStr)
-        val list = mutableListOf<FlightLegInput>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            list.add(
-                FlightLegInput(
-                    depDate = obj.optString("depDate", ""),
-                    arrDate = obj.optString("arrDate", ""),
-                    from = obj.optString("from", ""),
-                    to = obj.optString("to", ""),
-                    taskNumber = obj.optString("taskNumber", "")
-                )
+        val arr = JSONArray(json)
+        (0 until arr.length()).map { i -> arr.getString(i) }
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+fun saveHistoryItem(prefs: android.content.SharedPreferences, key: String, item: String): List<String> {
+    val history = loadHistory(prefs, key).toMutableList()
+    if (item.isNotBlank() && !history.contains(item)) {
+        history.add(0, item)
+        if (history.size > 20) history.removeAt(history.size - 1)
+    }
+    val arr = JSONArray(history)
+    prefs.edit().putString(key, arr.toString()).apply()
+    return history
+}
+
+fun loadDraftExpenses(prefs: android.content.SharedPreferences): List<ExpenseItem> {
+    val json = prefs.getString("draft_expenses", "[]") ?: "[]"
+    return try {
+        val arr = JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            ExpenseItem(
+                date = obj.optString("date", ""),
+                docNumber = obj.optString("docNumber", ""),
+                name = obj.optString("name", ""),
+                sum = obj.optDouble("sum", 0.0)
             )
         }
-        list
     } catch (e: Exception) {
         emptyList()
     }
@@ -1111,147 +905,45 @@ fun saveDraft(
     destinationCity: String,
     startDate: String,
     endDate: String,
-    region: Region,
+    selectedRegion: Region,
     expenses: List<ExpenseItem>
 ) {
-    val jsonArray = JSONArray()
-    expenses.forEach { item ->
-        val obj = JSONObject()
-        obj.put("date", item.date)
-        obj.put("docNumber", item.docNumber)
-        obj.put("name", item.name)
-        obj.put("sum", item.sum)
-        jsonArray.put(obj)
+    val arr = JSONArray()
+    expenses.forEach { expense ->
+        arr.put(JSONObject().apply {
+            put("date", expense.date)
+            put("docNumber", expense.docNumber)
+            put("name", expense.name)
+            put("sum", expense.sum)
+        })
     }
-    prefs.edit()
-        .putString("draft_report_date", reportDate)
-        .putString("draft_destination_city", destinationCity)
-        .putString("draft_start_date", startDate)
-        .putString("draft_end_date", endDate)
-        .putString("draft_region", region.name)
-        .putString("draft_expenses", jsonArray.toString())
-        .apply()
-}
-
-fun loadDraftExpenses(prefs: android.content.SharedPreferences): List<ExpenseItem> {
-    val jsonStr = prefs.getString("draft_expenses", null) ?: return emptyList()
-    return try {
-        val array = JSONArray(jsonStr)
-        val list = mutableListOf<ExpenseItem>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            list.add(
-                ExpenseItem(
-                    date = obj.optString("date", ""),
-                    docNumber = obj.optString("docNumber", ""),
-                    name = obj.optString("name", ""),
-                    sum = obj.optDouble("sum", 0.0)
-                )
-            )
-        }
-        list
-    } catch (e: Exception) {
-        emptyList()
+    prefs.edit().apply {
+        putString("draft_report_date", reportDate)
+        putString("draft_destination_city", destinationCity)
+        putString("draft_start_date", startDate)
+        putString("draft_end_date", endDate)
+        putString("draft_region", selectedRegion.name)
+        putString("draft_expenses", arr.toString())
+        apply()
     }
 }
 
-fun loadHistory(prefs: android.content.SharedPreferences, key: String): List<String> {
-    val set = prefs.getStringSet(key, emptySet()) ?: emptySet()
-    return set.toList()
-}
-
-fun saveHistoryItem(prefs: android.content.SharedPreferences, key: String, item: String): List<String> {
-    if (item.isBlank()) return loadHistory(prefs, key)
-    val current = prefs.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
-    current.add(item.trim())
-    prefs.edit().putStringSet(key, current).apply()
-    return current.toList()
-}
-
-fun calculateDays(startDateStr: String, endDateStr: String): Long {
+fun calculateDays(startDate: String, endDate: String): Long {
     return try {
         val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-        val start = LocalDate.parse(startDateStr, formatter)
-        val end = LocalDate.parse(endDateStr, formatter)
-        if (!end.isBefore(start)) {
-            ChronoUnit.DAYS.between(start, end) + 1
-        } else 0L
+        val start = LocalDate.parse(startDate, formatter)
+        val end = LocalDate.parse(endDate, formatter)
+        ChronoUnit.DAYS.between(start, end) + 1
     } catch (e: Exception) {
-        0L
+        0
     }
 }
 
-private fun generateAndOpenReport(context: Context, data: ReportData) {
-    try {
-        val safePurpose = data.purpose
-            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            .trim()
-            .ifEmpty { "Авансовый_отчет" }
-        val fileName = "$safePurpose.docx"
-        val outFile = File(context.cacheDir, fileName)
-        DocxGenerator.generateReport(context, data, outFile)
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.provider",
-            outFile
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать отчет"))
-    } catch (e: Exception) {
-        e.printStackTrace()
-        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
-        Toast.makeText(context, "Ошибка: $errorDetails", Toast.LENGTH_LONG).show()
-    }
-}
-
-private fun generateAndOpenMemo(context: Context, legsInput: List<FlightLegInput>) {
-    try {
-        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-        val fullName = prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович"
-        val tabNumber = prefs.getString("emp_tab_number", "8701") ?: "8701"
-        val position = prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО"
-        val department = prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов"
-        val memoLegs = legsInput.map { leg ->
-            val (depD, depM, depY) = parseDateToComponents(leg.depDate)
-            val (arrD, arrM, arrY) = parseDateToComponents(leg.arrDate)
-            FlightLeg(
-                from = leg.from,
-                to = leg.to,
-                depDay = depD,
-                depMonth = depM,
-                depYear = depY,
-                arrDay = arrD,
-                arrMonth = arrM,
-                arrYear = arrY,
-                taskNumber = leg.taskNumber
-            )
-        }
-        val memoData = MemoData(
-            employeeName = fullName,
-            position = position,
-            department = department,
-            tabNum = tabNumber,
-            legs = memoLegs
-        )
-        val fileName = "Убытие_прибытие.xlsx"
-        val outFile = File(context.cacheDir, fileName)
-        XlsxGenerator.generateMemo(context, memoData, outFile)
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.provider",
-            outFile
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(intent, "Открыть или распечатать служебную записку"))
-    } catch (e: Exception) {
-        e.printStackTrace()
-        val errorDetails = e.localizedMessage ?: e.javaClass.simpleName
-        Toast.makeText(context, "Ошибка: $errorDetails", Toast.LENGTH_LONG).show()
+fun String.toShortName(): String {
+    val parts = this.trim().split("\\s+".toRegex())
+    return when {
+        parts.size >= 3 -> "${parts[0]} ${parts[1].firstOrNull()?.uppercaseChar()}.${parts[2].firstOrNull()?.uppercaseChar()}."
+        parts.size == 2 -> "${parts[0]} ${parts[1].firstOrNull()?.uppercaseChar()}."
+        else -> this
     }
 }
