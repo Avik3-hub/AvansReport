@@ -1,5 +1,4 @@
 package com.example.avans
-
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -89,7 +88,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainAppPager(
@@ -143,7 +141,6 @@ fun MainAppPager(
         }
     }
 }
-
 data class FlightLegInput(
     val depDate: String = "",
     val arrDate: String = "",
@@ -151,7 +148,6 @@ data class FlightLegInput(
     val to: String = "",
     val taskNumber: String = ""
 )
-
 @Composable
 fun FlightDetailsBlock() {
     val context = LocalContext.current
@@ -224,7 +220,7 @@ fun FlightDetailsBlock() {
     }
 }
     }
-
+}
 @Composable
 fun FlightLegCard(
     index: Int,
@@ -260,6 +256,218 @@ fun FlightLegCard(
                     value = leg.arrDate,
                     onDateSelected = { onUpdate(leg.copy(arrDate = it)) },
                     modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.from,
+                onValueChange = { onUpdate(leg.copy(from = it)) },
+                label = { Text("Откуда") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.to,
+                onValueChange = { onUpdate(leg.copy(to = it)) },
+                label = { Text("Куда") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = leg.taskNumber,
+                onValueChange = { onUpdate(leg.copy(taskNumber = it)) },
+                label = { Text("№ Полетного задания") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+enum class Region { SOUTH, NORTH }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AvansReportScreen(
+    isDarkMode: Boolean,
+    onThemeToggle: () -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
+    var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
+    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович") }
+    var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
+    var position by remember { mutableStateOf(prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО") }
+    var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var showEmployeeDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
+    var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
+    
+    var reportDate by remember {
+        mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
+    }
+    var destinationCity by remember {
+        mutableStateOf(prefs.getString("draft_destination_city", "Вологду") ?: "Вологду")
+    }
+    var startDate by remember {
+        mutableStateOf(prefs.getString("draft_start_date", "") ?: "")
+    }
+    var endDate by remember {
+        mutableStateOf(prefs.getString("draft_end_date", "") ?: "")
+    }
+    var selectedRegion by remember {
+        val regionStr = prefs.getString("draft_region", Region.SOUTH.name)
+        mutableStateOf(if (regionStr == Region.NORTH.name) Region.NORTH else Region.SOUTH)
+    }
+    var expenses by remember {
+        mutableStateOf(loadDraftExpenses(prefs))
+    }
+    
+    LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
+        saveDraft(prefs, reportDate, destinationCity, startDate, endDate, selectedRegion, expenses)
+    }
+    
+    val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
+    val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
+    val perDiemSum = daysCount * currentRate
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Авансовый отчет АО-1") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                actions = {
+                    IconButton(onClick = { showMenu = !showMenu }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Меню")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Данные сотрудника") },
+                            onClick = {
+                                showMenu = false
+                                showEmployeeDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Настройки суточных") },
+                            onClick = {
+                                showMenu = false
+                                showSettingsDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Text(if (isDarkMode) "Тема оформления: светлая" else "Тема оформления: темная") 
+                            },
+                            onClick = {
+                                showMenu = false
+                                onThemeToggle()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Сброс заполнения") },
+                            onClick = {
+                                showMenu = false
+                                reportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                                destinationCity = ""
+                                startDate = ""
+                                endDate = ""
+                                selectedRegion = Region.SOUTH
+                                expenses = emptyList()
+                                Toast.makeText(context, "Черновик очищен", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text("1. Основные данные", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                DatePickerField(
+                    label = "Дата составления отчета",
+                    value = reportDate,
+                    onDateSelected = { reportDate = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                AutoCompleteTextField(
+                    value = destinationCity,
+                    onValueChange = { destinationCity = it },
+                    label = "Место назначения",
+                    prefixText = "Командировка в ",
+                    history = destinationHistory
+                )
+            }
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("2. Суточные (1-я строка таблицы)", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Выбор региона:", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            FilterChip(
+                                selected = selectedRegion == Region.SOUTH,
+                                onClick = { selectedRegion = Region.SOUTH },
+                                label = { Text("Юг (${southRate.toInt()} ₽/день)") }
+                            )
+                            FilterChip(
+                                selected = selectedRegion == Region.NORTH,
+                                onClick = { selectedRegion = Region.NORTH },
+                                label = { Text("Север (${northRate.toInt()} ₽/день)") }
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DatePickerField(
+                                label = "Дата начала",
+                                value = startDate,
+                                onDateSelected = { startDate = it },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DatePickerField(
+                                label = "Дата конца",
+                                value = endDate,
+                                onDateSelected = { endDate = it },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Дней: $daysCount | Сумма: ${String.format(Locale.US, "%.2f", perDiemSum)} ₽",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                .weight(1f)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
