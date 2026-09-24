@@ -52,7 +52,7 @@ import java.util.Locale
 
 enum class AppTheme(val title: String) {
     CLASSIC("Бортовой журнал"),
-    BLUE("Синяя"),
+    BLUE("Светлая"),
     AMOLED("AMOLED")
 }
 
@@ -197,7 +197,7 @@ fun MainAppPager(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val pages = listOf("Перелёты" to "✈", "Отчёт" to "₽", "Ещё" to "...")
+                        val pages = listOf("Перелёты" to "✈", "Отчёт" to "₽", "Ещё" to "⋯")
                         pages.forEachIndexed { index, item ->
                             CompactNavItem(
                                 title = item.first,
@@ -223,8 +223,11 @@ fun MainAppPager(
                 color = MaterialTheme.colorScheme.background
             ) {
                 when (page) {
-                    0 -> FlightDetailsBlock()
-                    1 -> AvansReportScreen(settingsRevision = settingsRevision)
+                    0 -> FlightDetailsBlock(appTheme = appTheme)
+                    1 -> AvansReportScreen(
+                        settingsRevision = settingsRevision,
+                        appTheme = appTheme
+                    )
                     2 -> MoreScreen(
                         appTheme = appTheme,
                         onThemeSelected = onThemeSelected,
@@ -257,7 +260,7 @@ private fun CompactNavItem(
             Text(
                 symbol,
                 fontFamily = FontFamily.SansSerif,
-                fontSize = if (symbol == "...") 18.sp else 17.sp,
+                fontSize = if (symbol == "⋯") 20.sp else 17.sp,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.width(5.dp))
@@ -283,8 +286,18 @@ data class FlightLegInput(
 private fun AviationHeader(
     title: String,
     subtitle: String,
+    appTheme: AppTheme,
     action: (@Composable () -> Unit)? = null
 ) {
+    val headerImage = when (appTheme) {
+        AppTheme.BLUE -> R.drawable.header_light
+        AppTheme.CLASSIC, AppTheme.AMOLED -> R.drawable.header_board_log
+    }
+    val headerLabel = when (appTheme) {
+        AppTheme.BLUE -> "Ми-171\nСветлая тема"
+        AppTheme.CLASSIC -> "Ми-171\nБортовой журнал"
+        AppTheme.AMOLED -> "Ми-171\nAMOLED"
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -296,7 +309,7 @@ private fun AviationHeader(
                 .height(168.dp)
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_launcher),
+                painter = painterResource(headerImage),
                 contentDescription = "Ми-171",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -306,8 +319,8 @@ private fun AviationHeader(
                 modifier = Modifier.fillMaxSize().background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.92f),
-                            Color.Black.copy(alpha = 0.52f),
+                            Color.Black.copy(alpha = 0.88f),
+                            Color.Black.copy(alpha = 0.40f),
                             Color.Transparent
                         )
                     )
@@ -323,7 +336,7 @@ private fun AviationHeader(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(3.dp).height(34.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
                     Spacer(Modifier.width(10.dp))
-                    Text("Ми-171\nБортовой журнал", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.9f))
+                    Text(headerLabel, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.9f))
                 }
             }
             action?.let {
@@ -334,7 +347,7 @@ private fun AviationHeader(
 }
 
 @Composable
-fun FlightDetailsBlock() {
+fun FlightDetailsBlock(appTheme: AppTheme) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
     var legs by remember { mutableStateOf(loadDraftLegs(prefs)) }
@@ -354,6 +367,7 @@ fun FlightDetailsBlock() {
             AviationHeader(
                 title = "Перелёты",
                 subtitle = "Маршруты командировки",
+                appTheme = appTheme,
                 action = {
                     FilledTonalButton(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -524,7 +538,8 @@ private fun SectionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvansReportScreen(
-    settingsRevision: Int
+    settingsRevision: Int,
+    appTheme: AppTheme
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
@@ -565,7 +580,7 @@ fun AvansReportScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
             item {
-                AviationHeader("Авансовый отчёт", "Форма АО-1")
+                AviationHeader("Авансовый отчёт", "Форма АО-1", appTheme)
             }
             item {
                 SectionCard("Основные данные", "Дата отчёта и место командировки") {
@@ -739,7 +754,7 @@ private fun MoreScreen(
         contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { AviationHeader("Ещё", "Настройки приложения") }
+        item { AviationHeader("Ещё", "Настройки приложения", appTheme) }
         item {
             SectionCard("Профиль и расчёты") {
                 SettingsRow("Данные сотрудника", "ФИО, табельный номер и должность") {
