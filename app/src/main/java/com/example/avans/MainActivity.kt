@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -33,7 +32,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,22 +51,22 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 enum class AppTheme(val title: String) {
-    CLASSIC("Классика"),
+    CLASSIC("Бортовой журнал"),
     BLUE("Синяя"),
     AMOLED("AMOLED")
 }
 
 private val ClassicColorScheme = darkColorScheme(
-    primary = Color(0xFFFFB74D),
-    onPrimary = Color(0xFF2B1700),
+    primary = Color(0xFFFFB545),
+    onPrimary = Color(0xFF241400),
     secondary = Color(0xFFFFCC80),
-    background = Color(0xFF15171A),
-    surface = Color(0xFF1D2024),
-    surfaceVariant = Color(0xFF25292E),
-    onBackground = Color(0xFFF4F0E8),
-    onSurface = Color(0xFFF4F0E8),
-    onSurfaceVariant = Color(0xFFC9C4BB),
-    outline = Color(0xFF696D72)
+    background = Color(0xFF080A0C),
+    surface = Color(0xFF101316),
+    surfaceVariant = Color(0xFF191D21),
+    onBackground = Color(0xFFF4F5F6),
+    onSurface = Color(0xFFF4F5F6),
+    onSurfaceVariant = Color(0xFFBEC3C9),
+    outline = Color(0xFF41474E)
 )
 
 private val BlueColorScheme = lightColorScheme(
@@ -97,19 +95,18 @@ private val AmoledColorScheme = darkColorScheme(
     outline = Color(0xFF62676C)
 )
 
-private val AvansFont = FontFamily(Font(R.font.arialmt))
 private val BaseTypography = Typography()
 private val AvansTypography = Typography(
-    headlineSmall = BaseTypography.headlineSmall.copy(fontFamily = AvansFont, fontSize = 23.sp, fontWeight = FontWeight.Bold),
-    titleLarge = BaseTypography.titleLarge.copy(fontFamily = AvansFont, fontSize = 19.sp, fontWeight = FontWeight.Bold),
-    titleMedium = BaseTypography.titleMedium.copy(fontFamily = AvansFont, fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = BaseTypography.titleSmall.copy(fontFamily = AvansFont, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = BaseTypography.bodyLarge.copy(fontFamily = AvansFont, fontSize = 15.sp),
-    bodyMedium = BaseTypography.bodyMedium.copy(fontFamily = AvansFont, fontSize = 13.sp),
-    bodySmall = BaseTypography.bodySmall.copy(fontFamily = AvansFont, fontSize = 12.sp),
-    labelLarge = BaseTypography.labelLarge.copy(fontFamily = AvansFont, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = BaseTypography.labelMedium.copy(fontFamily = AvansFont, fontSize = 12.sp, fontWeight = FontWeight.Medium),
-    labelSmall = BaseTypography.labelSmall.copy(fontFamily = AvansFont, fontSize = 10.sp)
+    headlineSmall = BaseTypography.headlineSmall.copy(fontFamily = FontFamily.SansSerif, fontSize = 24.sp, fontWeight = FontWeight.Bold),
+    titleLarge = BaseTypography.titleLarge.copy(fontFamily = FontFamily.SansSerif, fontSize = 19.sp, fontWeight = FontWeight.Bold),
+    titleMedium = BaseTypography.titleMedium.copy(fontFamily = FontFamily.SansSerif, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+    titleSmall = BaseTypography.titleSmall.copy(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = BaseTypography.bodyLarge.copy(fontFamily = FontFamily.SansSerif, fontSize = 15.sp),
+    bodyMedium = BaseTypography.bodyMedium.copy(fontFamily = FontFamily.SansSerif, fontSize = 13.sp),
+    bodySmall = BaseTypography.bodySmall.copy(fontFamily = FontFamily.SansSerif, fontSize = 12.sp),
+    labelLarge = BaseTypography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = BaseTypography.labelMedium.copy(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+    labelSmall = BaseTypography.labelSmall.copy(fontFamily = FontFamily.SansSerif, fontSize = 10.sp)
 )
 
 class MainActivity : ComponentActivity() {
@@ -119,9 +116,15 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
             var appTheme by remember {
-                val saved = prefs.getString("app_theme", null)
-                val fallback = if (prefs.getBoolean("is_dark_mode", false)) AppTheme.AMOLED else AppTheme.BLUE
-                mutableStateOf(AppTheme.entries.firstOrNull { it.name == saved } ?: fallback)
+                val styleVersion = prefs.getInt("ui_style_version", 0)
+                val selected = if (styleVersion < 2) {
+                    prefs.edit().putInt("ui_style_version", 2).putString("app_theme", AppTheme.CLASSIC.name).apply()
+                    AppTheme.CLASSIC
+                } else {
+                    val saved = prefs.getString("app_theme", AppTheme.CLASSIC.name)
+                    AppTheme.entries.firstOrNull { it.name == saved } ?: AppTheme.CLASSIC
+                }
+                mutableStateOf(selected)
             }
             val view = LocalView.current
             val isDarkTheme = appTheme != AppTheme.BLUE
@@ -130,7 +133,7 @@ class MainActivity : ComponentActivity() {
                     val window = (view.context as Activity).window
                     val systemBarColor = when (appTheme) {
                         AppTheme.AMOLED -> android.graphics.Color.BLACK
-                        AppTheme.CLASSIC -> android.graphics.Color.rgb(21, 23, 26)
+                        AppTheme.CLASSIC -> android.graphics.Color.rgb(8, 10, 12)
                         AppTheme.BLUE -> android.graphics.Color.rgb(243, 246, 249)
                     }
                     window.statusBarColor = systemBarColor
@@ -179,13 +182,13 @@ fun MainAppPager(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 5.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 5.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 6.dp,
                     shadowElevation = 8.dp
                 ) {
@@ -194,12 +197,11 @@ fun MainAppPager(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val pages = listOf("Перелёты" to "", "Отчёт" to "₽", "Ещё" to "•••")
+                        val pages = listOf("Перелёты" to "✈", "Отчёт" to "₽", "Ещё" to "...")
                         pages.forEachIndexed { index, item ->
                             CompactNavItem(
                                 title = item.first,
                                 symbol = item.second,
-                                useHelicopter = index == 0,
                                 selected = pagerState.currentPage == index,
                                 onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                                 modifier = Modifier.weight(1f)
@@ -238,7 +240,6 @@ fun MainAppPager(
 private fun CompactNavItem(
     title: String,
     symbol: String,
-    useHelicopter: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -253,21 +254,19 @@ private fun CompactNavItem(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (useHelicopter) {
-                Surface(shape = CircleShape, modifier = Modifier.size(24.dp)) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            } else {
-                Text(symbol, fontSize = 17.sp, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (selected) {
-                Spacer(Modifier.width(6.dp))
-                Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
+            Text(
+                symbol,
+                fontFamily = FontFamily.SansSerif,
+                fontSize = if (symbol == "...") 18.sp else 17.sp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                title,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -288,39 +287,47 @@ private fun AviationHeader(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(126.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                            MaterialTheme.colorScheme.background
-                        )
-                    )
-                )
+                .height(168.dp)
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_launcher),
                 contentDescription = "Ми-171",
-                modifier = Modifier.align(Alignment.CenterEnd).size(126.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alpha = 0.92f
+                alpha = 1f
+            )
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.92f),
+                            Color.Black.copy(alpha = 0.52f),
+                            Color.Transparent
+                        )
+                    )
+                )
             )
             Column(
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp, end = 118.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp, end = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(title, style = MaterialTheme.typography.headlineSmall)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.78f))
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(3.dp).height(34.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Ми-171\nБортовой журнал", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.9f))
+                }
             }
             action?.let {
-                Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 10.dp)) { it() }
+                Box(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 10.dp)) { it() }
             }
         }
     }
@@ -493,15 +500,23 @@ private fun SectionCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            subtitle?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+            )
+            Column(
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                subtitle?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                content()
             }
-            content()
         }
     }
 }
@@ -943,8 +958,10 @@ fun AutoCompleteTextField(
             prefix = prefixText?.let { { Text(it) } },
             modifier = Modifier
                 .fillMaxWidth()
+                .height(58.dp)
                 .menuAnchor(),
-            singleLine = true
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge
         )
         if (filteredHistory.isNotEmpty()) {
             ExposedDropdownMenu(
@@ -979,9 +996,10 @@ fun DatePickerField(
             value = value,
             onValueChange = {},
             readOnly = true,
-            label = { Text(label) },
+            label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
             trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Календарь") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().height(58.dp),
+            textStyle = MaterialTheme.typography.bodyLarge
         )
         Box(
             modifier = Modifier
@@ -1029,9 +1047,9 @@ fun ExpenseCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1056,7 +1074,7 @@ fun ExpenseCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             
             AutoCompleteTextField(
                 value = expense.name,
@@ -1064,13 +1082,14 @@ fun ExpenseCard(
                 label = "Наименование расхода",
                 history = nameHistory
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             OutlinedTextField(
                 value = if (expense.sum == 0.0) "" else expense.sum.toString(),
                 onValueChange = { onUpdate(expense.copy(sum = it.toDoubleOrNull() ?: 0.0)) },
                 label = { Text("Сумма (руб.)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
         }
     }
