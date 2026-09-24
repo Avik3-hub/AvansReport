@@ -11,7 +11,7 @@ android {
         applicationId = "com.example.avans"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
+        versionCode = 6
         versionName = "2.0"
 
         vectorDrawables {
@@ -31,9 +31,16 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("permanent")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("permanent")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -85,7 +92,4 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     implementation("org.apache.poi:poi-ooxml:5.2.5")
-    
-    // iTextPDF
-    implementation("com.itextpdf:itextpdf:5.5.13.3")
 }

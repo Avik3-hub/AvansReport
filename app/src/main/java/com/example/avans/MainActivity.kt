@@ -22,15 +22,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -94,13 +96,19 @@ private val AmoledColorScheme = darkColorScheme(
     outline = Color(0xFF62676C)
 )
 
+private val AvansFont = FontFamily(Font(R.font.arialmt))
+private val BaseTypography = Typography()
 private val AvansTypography = Typography(
-    headlineSmall = Typography().headlineSmall.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold),
-    titleLarge = Typography().titleLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
-    titleMedium = Typography().titleMedium.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
-    bodyLarge = Typography().bodyLarge.copy(fontFamily = FontFamily.SansSerif),
-    bodyMedium = Typography().bodyMedium.copy(fontFamily = FontFamily.SansSerif),
-    labelLarge = Typography().labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
+    headlineSmall = BaseTypography.headlineSmall.copy(fontFamily = AvansFont, fontSize = 23.sp, fontWeight = FontWeight.Bold),
+    titleLarge = BaseTypography.titleLarge.copy(fontFamily = AvansFont, fontSize = 19.sp, fontWeight = FontWeight.Bold),
+    titleMedium = BaseTypography.titleMedium.copy(fontFamily = AvansFont, fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+    titleSmall = BaseTypography.titleSmall.copy(fontFamily = AvansFont, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = BaseTypography.bodyLarge.copy(fontFamily = AvansFont, fontSize = 15.sp),
+    bodyMedium = BaseTypography.bodyMedium.copy(fontFamily = AvansFont, fontSize = 13.sp),
+    bodySmall = BaseTypography.bodySmall.copy(fontFamily = AvansFont, fontSize = 12.sp),
+    labelLarge = BaseTypography.labelLarge.copy(fontFamily = AvansFont, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = BaseTypography.labelMedium.copy(fontFamily = AvansFont, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+    labelSmall = BaseTypography.labelSmall.copy(fontFamily = AvansFont, fontSize = 10.sp)
 )
 
 class MainActivity : ComponentActivity() {
@@ -163,19 +171,40 @@ fun MainAppPager(
     appTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit
 ) {
-    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val scope = rememberCoroutineScope()
+    var settingsRevision by remember { mutableIntStateOf(0) }
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val pages = listOf("Перелёты" to "✈", "Отчёт" to "₽")
-                pages.forEachIndexed { index, item ->
-                    NavigationBarItem(
-                        selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                        icon = { Text(item.second, fontSize = 20.sp) },
-                        label = { Text(item.first) }
-                    )
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val pages = listOf("Перелёты" to "", "Отчёт" to "₽", "Ещё" to "•••")
+                        pages.forEachIndexed { index, item ->
+                            CompactNavItem(
+                                title = item.first,
+                                symbol = item.second,
+                                useHelicopter = index == 0,
+                                selected = pagerState.currentPage == index,
+                                onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -192,8 +221,51 @@ fun MainAppPager(
             ) {
                 when (page) {
                     0 -> FlightDetailsBlock()
-                    1 -> AvansReportScreen(appTheme = appTheme, onThemeSelected = onThemeSelected)
+                    1 -> AvansReportScreen(settingsRevision = settingsRevision)
+                    2 -> MoreScreen(
+                        appTheme = appTheme,
+                        onThemeSelected = onThemeSelected,
+                        onSettingsChanged = { settingsRevision++ }
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactNavItem(
+    title: String,
+    symbol: String,
+    useHelicopter: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxHeight().clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (useHelicopter) {
+                Surface(shape = CircleShape, modifier = Modifier.size(24.dp)) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_launcher),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                Text(symbol, fontSize = 17.sp, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (selected) {
+                Spacer(Modifier.width(6.dp))
+                Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -208,6 +280,52 @@ data class FlightLegInput(
 )
 
 @Composable
+private fun AviationHeader(
+    title: String,
+    subtitle: String,
+    action: (@Composable () -> Unit)? = null
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(126.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher),
+                contentDescription = "Ми-171",
+                modifier = Modifier.align(Alignment.CenterEnd).size(126.dp),
+                contentScale = ContentScale.Crop,
+                alpha = 0.92f
+            )
+            Column(
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp, end = 118.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(title, style = MaterialTheme.typography.headlineSmall)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            action?.let {
+                Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 10.dp)) { it() }
+            }
+        }
+    }
+}
+
+@Composable
 fun FlightDetailsBlock() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
@@ -220,33 +338,27 @@ fun FlightDetailsBlock() {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Перелёты", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Маршруты командировки",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                FilledTonalButton(onClick = {
+            AviationHeader(
+                title = "Перелёты",
+                subtitle = "Маршруты командировки",
+                action = {
+                    FilledTonalButton(
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        onClick = {
                     if (legs.size < 7) {
                         legs = legs + FlightLegInput()
                     } else {
                         Toast.makeText(context, "Максимум 7 перелетов", Toast.LENGTH_SHORT).show()
                     }
-                }) {
-                    Text("+ Перелёт")
+                        }
+                    ) { Text("+ Перелёт") }
                 }
-            }
+            )
         }
 
         if (legs.isEmpty()) {
@@ -277,12 +389,11 @@ fun FlightDetailsBlock() {
         }
 
         item {
-            Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = { generateAndOpenMemo(context, legs) },
                 modifier = Modifier
                     .fillMaxWidth()
-                .height(54.dp),
+                    .height(50.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Text("Сформировать служебную записку")
@@ -302,9 +413,9 @@ fun FlightLegCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -324,7 +435,7 @@ fun FlightLegCard(
                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DatePickerField(
                     label = "Убытие:",
@@ -339,28 +450,28 @@ fun FlightLegCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = leg.from,
                 onValueChange = { onUpdate(leg.copy(from = it)) },
                 label = { Text("Откуда") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 singleLine = true
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = leg.to,
                 onValueChange = { onUpdate(leg.copy(to = it)) },
                 label = { Text("Куда") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 singleLine = true
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = leg.taskNumber,
                 onValueChange = { onUpdate(leg.copy(taskNumber = it)) },
                 label = { Text("№ полётного задания") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 singleLine = true
             )
         }
@@ -379,11 +490,11 @@ private fun SectionCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             subtitle?.let {
@@ -397,39 +508,31 @@ private fun SectionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvansReportScreen(
-    appTheme: AppTheme,
-    onThemeSelected: (AppTheme) -> Unit
+    settingsRevision: Int
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    var southRate by remember { mutableDoubleStateOf(prefs.getFloat("south_rate", 500f).toDouble()) }
-    var northRate by remember { mutableDoubleStateOf(prefs.getFloat("north_rate", 700f).toDouble()) }
-    var employeeName by remember { mutableStateOf(prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович") }
-    var tabNumber by remember { mutableStateOf(prefs.getString("emp_tab_number", "8701") ?: "8701") }
-    var position by remember { mutableStateOf(prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО") }
-    var department by remember { mutableStateOf(prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов") }
-    var showSettingsDialog by remember { mutableStateOf(false) }
-    var showEmployeeDialog by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-    var destinationHistory by remember { mutableStateOf(loadHistory(prefs, "history_destinations")) }
-    var expenseNameHistory by remember { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
-    var reportDate by remember {
+    val southRate = remember(settingsRevision) { prefs.getFloat("south_rate", 500f).toDouble() }
+    val northRate = remember(settingsRevision) { prefs.getFloat("north_rate", 700f).toDouble() }
+    var destinationHistory by remember(settingsRevision) { mutableStateOf(loadHistory(prefs, "history_destinations")) }
+    var expenseNameHistory by remember(settingsRevision) { mutableStateOf(loadHistory(prefs, "history_expense_names")) }
+    var reportDate by remember(settingsRevision) {
         mutableStateOf(prefs.getString("draft_report_date", null) ?: LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
     }
-    var destinationCity by remember {
+    var destinationCity by remember(settingsRevision) {
         mutableStateOf(prefs.getString("draft_destination_city", "Вологду") ?: "Вологду")
     }
-    var startDate by remember {
+    var startDate by remember(settingsRevision) {
         mutableStateOf(prefs.getString("draft_start_date", "") ?: "")
     }
-    var endDate by remember {
+    var endDate by remember(settingsRevision) {
         mutableStateOf(prefs.getString("draft_end_date", "") ?: "")
     }
-    var selectedRegion by remember {
+    var selectedRegion by remember(settingsRevision) {
         val regionStr = prefs.getString("draft_region", Region.SOUTH.name)
         mutableStateOf(if (regionStr == Region.NORTH.name) Region.NORTH else Region.SOUTH)
     }
-    var expenses by remember {
+    var expenses by remember(settingsRevision) {
         mutableStateOf(loadDraftExpenses(prefs))
     }
     LaunchedEffect(reportDate, destinationCity, startDate, endDate, selectedRegion, expenses) {
@@ -440,83 +543,14 @@ fun AvansReportScreen(
     val perDiemSum = daysCount * currentRate
     val expensesSum = expenses.sumOf { it.sum }
     val totalSum = perDiemSum + expensesSum
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Авансовый отчёт", style = MaterialTheme.typography.titleLarge)
-                        Text("Форма АО-1", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                actions = {
-                    IconButton(onClick = { showMenu = !showMenu }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Меню")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Данные сотрудника") },
-                            onClick = {
-                                showMenu = false
-                                showEmployeeDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Настройки суточных") },
-                            onClick = {
-                                showMenu = false
-                                showSettingsDialog = true
-                            }
-                        )
-                        Text(
-                            text = "Тема оформления",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                        AppTheme.entries.forEach { theme ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(if (theme == appTheme) "✓ ${theme.title}" else theme.title)
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    onThemeSelected(theme)
-                                }
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text("Сброс заполнения") },
-                            onClick = {
-                                showMenu = false
-                                reportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                destinationCity = ""
-                                startDate = ""
-                                endDate = ""
-                                selectedRegion = Region.SOUTH
-                                expenses = emptyList()
-                                Toast.makeText(context, "Черновик очищен", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+            item {
+                AviationHeader("Авансовый отчёт", "Форма АО-1")
+            }
             item {
                 SectionCard("Основные данные", "Дата отчёта и место командировки") {
                     DatePickerField(
@@ -629,6 +663,10 @@ fun AvansReportScreen(
                 Button(
                     onClick = {
                         val fullPurpose = "Командировка в $destinationCity".trim()
+                        val employeeName = prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович"
+                        val tabNumber = prefs.getString("emp_tab_number", "8701") ?: "8701"
+                        val position = prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО"
+                        val department = prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов"
                         
                         destinationHistory = saveHistoryItem(prefs, "history_destinations", destinationCity)
                         expenses.map { it.name }.filter { it.isNotBlank() }.forEach { name ->
@@ -667,44 +705,134 @@ fun AvansReportScreen(
                 )
             }
         }
+}
+
+@Composable
+private fun MoreScreen(
+    appTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit,
+    onSettingsChanged: () -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    var showEmployeeDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item { AviationHeader("Ещё", "Настройки приложения") }
+        item {
+            SectionCard("Профиль и расчёты") {
+                SettingsRow("Данные сотрудника", "ФИО, табельный номер и должность") {
+                    showEmployeeDialog = true
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SettingsRow("Ставки суточных", "Юг и Север") {
+                    showSettingsDialog = true
+                }
+            }
+        }
+        item {
+            SectionCard("Оформление", "Цветовая тема интерфейса") {
+                AppTheme.entries.forEach { theme ->
+                    val selected = theme == appTheme
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onThemeSelected(theme) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(if (selected) "●" else "○", color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Text(theme.title, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            SectionCard("Данные") {
+                OutlinedButton(
+                    onClick = {
+                        prefs.edit()
+                            .remove("draft_report_date")
+                            .remove("draft_destination_city")
+                            .remove("draft_start_date")
+                            .remove("draft_end_date")
+                            .remove("draft_region")
+                            .remove("draft_expenses")
+                            .apply()
+                        onSettingsChanged()
+                        Toast.makeText(context, "Черновик отчёта очищен", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Сбросить заполнение отчёта") }
+            }
+        }
+        item {
+            Text(
+                "AvansReport 2.0\nРазработка © Avik3",
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
+
     if (showEmployeeDialog) {
         EmployeeDialog(
-            currentName = employeeName,
-            currentTabNumber = tabNumber,
-            currentPosition = position,
-            currentDepartment = department,
+            currentName = prefs.getString("emp_name", "Нагибин Сергей Викторович") ?: "Нагибин Сергей Викторович",
+            currentTabNumber = prefs.getString("emp_tab_number", "8701") ?: "8701",
+            currentPosition = prefs.getString("emp_position", "техник АиРЭО") ?: "техник АиРЭО",
+            currentDepartment = prefs.getString("emp_department", "участок ТО вертолетов") ?: "участок ТО вертолетов",
             onDismiss = { showEmployeeDialog = false },
-            onSave = { name, tab, pos, dept ->
-                employeeName = name
-                tabNumber = tab
-                position = pos
-                department = dept
+            onSave = { name, tab, position, department ->
                 prefs.edit()
                     .putString("emp_name", name)
                     .putString("emp_tab_number", tab)
-                    .putString("emp_position", pos)
-                    .putString("emp_department", dept)
+                    .putString("emp_position", position)
+                    .putString("emp_department", department)
                     .apply()
                 showEmployeeDialog = false
+                onSettingsChanged()
             }
         )
     }
     if (showSettingsDialog) {
         SettingsDialog(
-            currentSouth = southRate,
-            currentNorth = northRate,
+            currentSouth = prefs.getFloat("south_rate", 500f).toDouble(),
+            currentNorth = prefs.getFloat("north_rate", 700f).toDouble(),
             onDismiss = { showSettingsDialog = false },
-            onSave = { newSouth, newNorth ->
-                southRate = newSouth
-                northRate = newNorth
+            onSave = { south, north ->
                 prefs.edit()
-                    .putFloat("south_rate", newSouth.toFloat())
-                    .putFloat("north_rate", newNorth.toFloat())
+                    .putFloat("south_rate", south.toFloat())
+                    .putFloat("north_rate", north.toFloat())
                     .apply()
                 showSettingsDialog = false
+                onSettingsChanged()
             }
         )
+    }
+}
+
+@Composable
+private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
