@@ -59,7 +59,11 @@ enum class AppTheme(val title: String) {
 private val ClassicColorScheme = darkColorScheme(
     primary = Color(0xFFFFB545),
     onPrimary = Color(0xFF241400),
+    primaryContainer = Color(0xFF5A3A0A),
+    onPrimaryContainer = Color(0xFFFFDDA5),
     secondary = Color(0xFFFFCC80),
+    secondaryContainer = Color(0xFF4A3518),
+    onSecondaryContainer = Color(0xFFFFDDA5),
     background = Color(0xFF080A0C),
     surface = Color(0xFF101316),
     surfaceVariant = Color(0xFF191D21),
@@ -72,7 +76,11 @@ private val ClassicColorScheme = darkColorScheme(
 private val BlueColorScheme = lightColorScheme(
     primary = Color(0xFF1769AA),
     onPrimary = Color.White,
+    primaryContainer = Color(0xFFCDE7FA),
+    onPrimaryContainer = Color(0xFF073653),
     secondary = Color(0xFF3C7DAF),
+    secondaryContainer = Color(0xFFD9EAF6),
+    onSecondaryContainer = Color(0xFF173B52),
     background = Color(0xFFF3F6F9),
     surface = Color(0xFFFFFFFF),
     surfaceVariant = Color(0xFFE7EEF4),
@@ -83,16 +91,20 @@ private val BlueColorScheme = lightColorScheme(
 )
 
 private val AmoledColorScheme = darkColorScheme(
-    primary = Color(0xFF7DB7DE),
-    onPrimary = Color(0xFF082030),
-    secondary = Color(0xFF91C4E5),
+    primary = Color(0xFFFFB545),
+    onPrimary = Color(0xFF241400),
+    primaryContainer = Color(0xFF5A3A0A),
+    onPrimaryContainer = Color(0xFFFFDDA5),
+    secondary = Color(0xFFFFCC80),
+    secondaryContainer = Color(0xFF4A3518),
+    onSecondaryContainer = Color(0xFFFFDDA5),
     background = Color.Black,
     surface = Color.Black,
     surfaceVariant = Color(0xFF111315),
     onBackground = Color(0xFFE5E7E9),
     onSurface = Color(0xFFE5E7E9),
-    onSurfaceVariant = Color(0xFFB7BDC2),
-    outline = Color(0xFF62676C)
+    onSurfaceVariant = Color(0xFFC8C0B4),
+    outline = Color(0xFF6D6254)
 )
 
 private val BaseTypography = Typography()
@@ -592,8 +604,7 @@ fun AvansReportScreen(
                     AutoCompleteTextField(
                         value = destinationCity,
                         onValueChange = { destinationCity = it },
-                        label = "Место назначения",
-                        prefixText = "Командировка в ",
+                        label = "Куда направляетесь",
                         history = destinationHistory
                     )
                 }
@@ -950,7 +961,6 @@ fun AutoCompleteTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    prefixText: String? = null,
     history: List<String>,
     modifier: Modifier = Modifier
 ) {
@@ -970,7 +980,6 @@ fun AutoCompleteTextField(
                 expanded = true
             },
             label = { Text(label) },
-            prefix = prefixText?.let { { Text(it) } },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp)
