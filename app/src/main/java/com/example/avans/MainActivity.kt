@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -29,10 +31,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -43,45 +49,107 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+enum class AppTheme(val title: String) {
+    CLASSIC("Классика"),
+    BLUE("Синяя"),
+    AMOLED("AMOLED")
+}
+
+private val ClassicColorScheme = darkColorScheme(
+    primary = Color(0xFFFFB74D),
+    onPrimary = Color(0xFF2B1700),
+    secondary = Color(0xFFFFCC80),
+    background = Color(0xFF15171A),
+    surface = Color(0xFF1D2024),
+    surfaceVariant = Color(0xFF25292E),
+    onBackground = Color(0xFFF4F0E8),
+    onSurface = Color(0xFFF4F0E8),
+    onSurfaceVariant = Color(0xFFC9C4BB),
+    outline = Color(0xFF696D72)
+)
+
+private val BlueColorScheme = lightColorScheme(
+    primary = Color(0xFF1769AA),
+    onPrimary = Color.White,
+    secondary = Color(0xFF3C7DAF),
+    background = Color(0xFFF3F6F9),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFE7EEF4),
+    onBackground = Color(0xFF17232D),
+    onSurface = Color(0xFF17232D),
+    onSurfaceVariant = Color(0xFF52616D),
+    outline = Color(0xFF758592)
+)
+
+private val AmoledColorScheme = darkColorScheme(
+    primary = Color(0xFF7DB7DE),
+    onPrimary = Color(0xFF082030),
+    secondary = Color(0xFF91C4E5),
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceVariant = Color(0xFF111315),
+    onBackground = Color(0xFFE5E7E9),
+    onSurface = Color(0xFFE5E7E9),
+    onSurfaceVariant = Color(0xFFB7BDC2),
+    outline = Color(0xFF62676C)
+)
+
+private val AvansTypography = Typography(
+    headlineSmall = Typography().headlineSmall.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold),
+    titleLarge = Typography().titleLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
+    titleMedium = Typography().titleMedium.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold),
+    bodyLarge = Typography().bodyLarge.copy(fontFamily = FontFamily.SansSerif),
+    bodyMedium = Typography().bodyMedium.copy(fontFamily = FontFamily.SansSerif),
+    labelLarge = Typography().labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-            var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", false)) }
+            var appTheme by remember {
+                val saved = prefs.getString("app_theme", null)
+                val fallback = if (prefs.getBoolean("is_dark_mode", false)) AppTheme.AMOLED else AppTheme.BLUE
+                mutableStateOf(AppTheme.entries.firstOrNull { it.name == saved } ?: fallback)
+            }
             val view = LocalView.current
+            val isDarkTheme = appTheme != AppTheme.BLUE
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = (view.context as Activity).window
-                    window.statusBarColor = if (isDarkMode) android.graphics.Color.BLACK else android.graphics.Color.TRANSPARENT
-                    window.navigationBarColor = if (isDarkMode) android.graphics.Color.BLACK else android.graphics.Color.TRANSPARENT
+                    val systemBarColor = when (appTheme) {
+                        AppTheme.AMOLED -> android.graphics.Color.BLACK
+                        AppTheme.CLASSIC -> android.graphics.Color.rgb(21, 23, 26)
+                        AppTheme.BLUE -> android.graphics.Color.rgb(243, 246, 249)
+                    }
+                    window.statusBarColor = systemBarColor
+                    window.navigationBarColor = systemBarColor
                     val insetsController = WindowCompat.getInsetsController(window, view)
-                    insetsController.isAppearanceLightStatusBars = !isDarkMode
-                    insetsController.isAppearanceLightNavigationBars = !isDarkMode
+                    insetsController.isAppearanceLightStatusBars = !isDarkTheme
+                    insetsController.isAppearanceLightNavigationBars = !isDarkTheme
                 }
             }
-            val oledDarkColorScheme = darkColorScheme(
-                primary = Color(0xFF90CAF9),
-                secondary = Color(0xFF64B5F6),
-                background = Color(0xFF000000),
-                surface = Color(0xFF000000),
-                surfaceVariant = Color(0xFF121212),
-                onBackground = Color(0xFFE6E1E5),
-                onSurface = Color(0xFFE6E1E5),
-                onSurfaceVariant = Color(0xFFCAC4D0)
-            )
-            val lightColorScheme = lightColorScheme(
-                primary = Color(0xFF1976D2),
-                secondary = Color(0xFF0288D1)
-            )
-            val colorScheme = if (isDarkMode) oledDarkColorScheme else lightColorScheme
-            MaterialTheme(colorScheme = colorScheme) {
+            val colorScheme = when (appTheme) {
+                AppTheme.CLASSIC -> ClassicColorScheme
+                AppTheme.BLUE -> BlueColorScheme
+                AppTheme.AMOLED -> AmoledColorScheme
+            }
+            MaterialTheme(
+                colorScheme = colorScheme,
+                typography = AvansTypography,
+                shapes = Shapes(
+                    small = RoundedCornerShape(10.dp),
+                    medium = RoundedCornerShape(16.dp),
+                    large = RoundedCornerShape(24.dp)
+                )
+            ) {
                 MainAppPager(
-                    isDarkMode = isDarkMode,
-                    onThemeToggle = {
-                        isDarkMode = !isDarkMode
-                        prefs.edit().putBoolean("is_dark_mode", isDarkMode).apply()
+                    appTheme = appTheme,
+                    onThemeSelected = { selected ->
+                        appTheme = selected
+                        prefs.edit().putString("app_theme", selected.name).apply()
                     }
                 )
             }
@@ -92,14 +160,31 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainAppPager(
-    isDarkMode: Boolean,
-    onThemeToggle: () -> Unit
+    appTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 2 })
-    Column(modifier = Modifier.fillMaxSize()) {
+    val scope = rememberCoroutineScope()
+    Scaffold(
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                val pages = listOf("Перелёты" to "✈", "Отчёт" to "₽")
+                pages.forEachIndexed { index, item ->
+                    NavigationBarItem(
+                        selected = pagerState.currentPage == index,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                        icon = { Text(item.second, fontSize = 20.sp) },
+                        label = { Text(item.first) }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         ) { page ->
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -107,36 +192,7 @@ fun MainAppPager(
             ) {
                 when (page) {
                     0 -> FlightDetailsBlock()
-                    1 -> AvansReportScreen(isDarkMode = isDarkMode, onThemeToggle = onThemeToggle)
-                }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val pages = listOf("Перелеты (1/2)", "Авансовый отчет (2/2)")
-            pages.forEachIndexed { index, title ->
-                val isSelected = pagerState.currentPage == index
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 6.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    1 -> AvansReportScreen(appTheme = appTheme, onThemeSelected = onThemeSelected)
                 }
             }
         }
@@ -173,15 +229,22 @@ fun FlightDetailsBlock() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Перелеты", style = MaterialTheme.typography.titleLarge)
-                Button(onClick = {
+                Column {
+                    Text("Перелёты", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "Маршруты командировки",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                FilledTonalButton(onClick = {
                     if (legs.size < 7) {
                         legs = legs + FlightLegInput()
                     } else {
                         Toast.makeText(context, "Максимум 7 перелетов", Toast.LENGTH_SHORT).show()
                     }
                 }) {
-                    Text("+ Перелет")
+                    Text("+ Перелёт")
                 }
             }
         }
@@ -189,7 +252,7 @@ fun FlightDetailsBlock() {
         if (legs.isEmpty()) {
             item {
                 Text(
-                    text = "Список перелетов пуст. Нажмите «+ Перелет» для добавления.",
+                    text = "Пока нет перелётов. Добавьте первый маршрут.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -219,9 +282,10 @@ fun FlightDetailsBlock() {
                 onClick = { generateAndOpenMemo(context, legs) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                .height(54.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Сформировать и открыть .xlsx")
+                Text("Сформировать служебную записку")
             }
         }
     }
@@ -236,7 +300,9 @@ fun FlightLegCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -244,7 +310,16 @@ fun FlightLegCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Перелет No$index", style = MaterialTheme.typography.titleMedium)
+                Column {
+                    Text("Перелёт №$index", style = MaterialTheme.typography.titleMedium)
+                    if (leg.from.isNotBlank() || leg.to.isNotBlank()) {
+                        Text(
+                            "${leg.from.ifBlank { "Откуда" }}  →  ${leg.to.ifBlank { "Куда" }}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.error)
                 }
@@ -284,7 +359,7 @@ fun FlightLegCard(
             OutlinedTextField(
                 value = leg.taskNumber,
                 onValueChange = { onUpdate(leg.copy(taskNumber = it)) },
-                label = { Text("No Полетного задания") },
+                label = { Text("№ полётного задания") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -294,11 +369,36 @@ fun FlightLegCard(
 
 enum class Region { SOUTH, NORTH }
 
+@Composable
+private fun SectionCard(
+    title: String,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            subtitle?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            content()
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvansReportScreen(
-    isDarkMode: Boolean,
-    onThemeToggle: () -> Unit
+    appTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
@@ -338,10 +438,17 @@ fun AvansReportScreen(
     val currentRate = if (selectedRegion == Region.SOUTH) southRate else northRate
     val daysCount = remember(startDate, endDate) { calculateDays(startDate, endDate) }
     val perDiemSum = daysCount * currentRate
+    val expensesSum = expenses.sumOf { it.sum }
+    val totalSum = perDiemSum + expensesSum
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Авансовый отчет АО-1") },
+                title = {
+                    Column {
+                        Text("Авансовый отчёт", style = MaterialTheme.typography.titleLarge)
+                        Text("Форма АО-1", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -368,15 +475,23 @@ fun AvansReportScreen(
                                 showSettingsDialog = true
                             }
                         )
-                        DropdownMenuItem(
-                            text = { 
-                                Text(if (isDarkMode) "Тема оформления: светлая" else "Тема оформления: темная") 
-                            },
-                            onClick = {
-                                showMenu = false
-                                onThemeToggle()
-                            }
+                        Text(
+                            text = "Тема оформления",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
+                        AppTheme.entries.forEach { theme ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (theme == appTheme) "✓ ${theme.title}" else theme.title)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onThemeSelected(theme)
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Сброс заполнения") },
                             onClick = {
@@ -403,32 +518,24 @@ fun AvansReportScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text("1. Основные данные", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                DatePickerField(
-                    label = "Дата составления отчета",
-                    value = reportDate,
-                    onDateSelected = { reportDate = it }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                AutoCompleteTextField(
-                    value = destinationCity,
-                    onValueChange = { destinationCity = it },
-                    label = "Место назначения",
-                    prefixText = "Командировка в ",
-                    history = destinationHistory
-                )
+                SectionCard("Основные данные", "Дата отчёта и место командировки") {
+                    DatePickerField(
+                        label = "Дата составления отчёта",
+                        value = reportDate,
+                        onDateSelected = { reportDate = it }
+                    )
+                    AutoCompleteTextField(
+                        value = destinationCity,
+                        onValueChange = { destinationCity = it },
+                        label = "Место назначения",
+                        prefixText = "Командировка в ",
+                        history = destinationHistory
+                    )
+                }
             }
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("2. Суточные (1-я строка таблицы)", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Выбор региона:", style = MaterialTheme.typography.bodyMedium)
+                SectionCard("Суточные", "Первая строка таблицы АО-1") {
+                        Text("Регион", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(vertical = 8.dp)
@@ -458,14 +565,19 @@ fun AvansReportScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Дней: $daysCount | Сумма: ${String.format(Locale.US, "%.2f", perDiemSum)} ₽",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("$daysCount дн.", style = MaterialTheme.typography.titleMedium)
+                                Text(formatRubles(perDiemSum), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
-                }
             }
             item {
                 Row(
@@ -473,11 +585,18 @@ fun AvansReportScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("3. Чеки и билеты", style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = {
+                    Column {
+                        Text("Чеки и билеты", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (expenses.isEmpty()) "Расходы не добавлены" else "Позиций: ${expenses.size}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    FilledTonalButton(onClick = {
                         expenses = expenses + ExpenseItem("", "", "", 0.0)
                     }) {
-                        Text("+ Добавить чек")
+                        Text("+ Чек")
                     }
                 }
             }
@@ -499,7 +618,14 @@ fun AvansReportScreen(
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                SectionCard("Итого по отчёту") {
+                    SummaryRow("Суточные", perDiemSum)
+                    SummaryRow("Чеки и билеты", expensesSum)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                    SummaryRow("Общая сумма", totalSum, emphasized = true)
+                }
+            }
+            item {
                 Button(
                     onClick = {
                         val fullPurpose = "Командировка в $destinationCity".trim()
@@ -526,10 +652,19 @@ fun AvansReportScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Сформировать и открыть .docx")
+                    Text("Сформировать авансовый отчёт")
                 }
+            }
+            item {
+                Text(
+                    text = "AvansReport 2.0  •  Разработка © Avik3",
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -569,6 +704,28 @@ fun AvansReportScreen(
                     .apply()
                 showSettingsDialog = false
             }
+        )
+    }
+}
+
+private fun formatRubles(value: Double): String =
+    "${String.format(Locale("ru", "RU"), "%,.2f", value)} ₽"
+
+@Composable
+private fun SummaryRow(label: String, value: Double, emphasized: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            formatRubles(value),
+            style = if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -741,7 +898,9 @@ fun ExpenseCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(

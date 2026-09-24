@@ -11,17 +11,30 @@ android {
         applicationId = "com.example.avans"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.3"
+        versionCode = 5
+        versionName = "2.0"
 
         vectorDrawables {
             useSupportLibrary = true
         }
     }
 
+    signingConfigs {
+        create("permanent") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("permanent")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("permanent")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
