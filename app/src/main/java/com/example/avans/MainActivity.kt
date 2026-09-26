@@ -740,7 +740,7 @@ fun AvansReportScreen(
             }
             item {
                 Text(
-                    text = "AvansReport 2.0  •  Разработка © Avik3",
+                    text = "AvansReport 2.0  •  © Avik3 и Си",
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -819,7 +819,7 @@ private fun MoreScreen(
         }
         item {
             Text(
-                "AvansReport 2.0\nРазработка © Avik3",
+                "AvansReport 2.0\n© Avik3 и Си",
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
